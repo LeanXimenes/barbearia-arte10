@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------
+# Barbearia Arte 10 — deploy do site publico no Netlify
+# ---------------------------------------------------------------------
+# As variaveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY precisam ser
+# cadastradas em: Site configuration > Environment variables.
+# Nenhuma credencial fica neste arquivo.
+# ---------------------------------------------------------------------
+
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Aplicacao de pagina unica: qualquer rota cai no index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

@@ -1,0 +1,10 @@
+# Configuracao do Supabase CLI — Barbearia Arte 10
+project_id = "barbearia-arte10"
+
+[db]
+major_version = 15
+
+[functions.notificar-agendamento]
+# A funcao e chamada pelo proprio banco (pg_net), nao por um usuario.
+# A autenticacao e feita pelo segredo EDGE_TOKEN, conferido no codigo.
+verify_jwt = false

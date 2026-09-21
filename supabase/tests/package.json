@@ -1,0 +1,13 @@
+{
+  "name": "arte10-db-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Suite de testes do banco da Barbearia Arte 10 (PostgreSQL embarcado via PGlite).",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.17"
+  }
+}

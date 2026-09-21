@@ -1,0 +1,672 @@
+/* =====================================================================
+   BARBEARIA ARTE 10 — Fluxo de agendamento
+   ===================================================================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(2, 5, 13, 0.78);
+  backdrop-filter: blur(8px);
+  animation: aparecer 180ms ease-out;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal__caixa {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 94svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--superficie-forte);
+  border: 1px solid var(--borda-suave);
+  border-bottom: none;
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--sombra);
+  animation: subir 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+@keyframes subir {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+@media (min-width: 640px) {
+  .modal {
+    align-items: center;
+    padding: 24px;
+  }
+  .modal__caixa {
+    border-radius: var(--raio-lg);
+    border-bottom: 1px solid var(--borda-suave);
+    max-height: 88svh;
+  }
+}
+
+.modal__topo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--borda-suave);
+  flex-shrink: 0;
+}
+
+.modal__titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 1.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.modal__fechar,
+.modal__voltar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--texto-suave);
+  transition: background var(--transicao), color var(--transicao);
+  flex-shrink: 0;
+}
+
+.modal__fechar:hover,
+.modal__voltar:hover {
+  background: rgba(154, 168, 198, 0.12);
+  color: var(--texto);
+}
+
+.modal__corpo {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal__rodape {
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--borda-suave);
+  background: rgba(7, 15, 34, 0.7);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Passos ---------------------------------------------------------- */
+
+.passos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--borda-suave);
+  flex-shrink: 0;
+}
+
+.passo {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(154, 168, 198, 0.16);
+  transition: background var(--transicao);
+}
+
+.passo--feito {
+  background: var(--ouro-600);
+}
+
+.passo--atual {
+  background: var(--ouro-400);
+}
+
+.passo-legenda {
+  padding: 12px 20px 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}
+
+/* Resumo da escolha ----------------------------------------------- */
+
+.resumo-escolha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(226, 184, 92, 0.1);
+  border: 1px solid rgba(226, 184, 92, 0.24);
+  color: var(--ouro-300);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Lista de serviços no modal --------------------------------------- */
+
+.opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda-suave);
+  background: rgba(14, 32, 71, 0.34);
+  text-align: left;
+  transition: border-color var(--transicao), background var(--transicao), transform var(--transicao);
+}
+
+.opcao:hover {
+  border-color: var(--ouro-600);
+  transform: translateX(2px);
+}
+
+.opcao--ativa {
+  border-color: var(--ouro-500);
+  background: rgba(226, 184, 92, 0.1);
+}
+
+.opcao__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.opcao__nome {
+  display: block;
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+
+.opcao__meta {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--texto-suave);
+}
+
+.opcao__preco {
+  font-weight: 700;
+  color: var(--ouro-400);
+  white-space: nowrap;
+}
+
+/* Calendário ------------------------------------------------------- */
+
+.calendario__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.calendario__mes {
+  font-family: var(--fonte-titulo);
+  font-size: 1.25rem;
+}
+
+.calendario__nav {
+  display: flex;
+  gap: 6px;
+}
+
+.calendario__seta {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--borda-suave);
+  color: var(--texto-suave);
+  transition: border-color var(--transicao), color var(--transicao);
+}
+
+.calendario__seta:hover:not(:disabled) {
+  border-color: var(--ouro-500);
+  color: var(--ouro-300);
+}
+
+.calendario__seta:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.calendario__semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.calendario__nome-dia {
+  text-align: center;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+  padding-block: 6px;
+}
+
+.calendario__grade {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.dia {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: var(--raio-sm);
+  border: 1px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--texto);
+  background: rgba(14, 32, 71, 0.3);
+  transition: border-color var(--transicao), background var(--transicao), color var(--transicao);
+  min-height: 44px;
+}
+
+.dia:hover:not(:disabled) {
+  border-color: var(--ouro-600);
+}
+
+.dia--vazio {
+  background: none;
+  pointer-events: none;
+}
+
+.dia--indisponivel {
+  color: var(--texto-fraco);
+  background: rgba(14, 32, 71, 0.14);
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: rgba(154, 168, 198, 0.4);
+}
+
+.dia--selecionado {
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.dia__ponto {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ouro-500);
+}
+
+.dia--selecionado .dia__ponto {
+  background: rgba(26, 18, 4, 0.55);
+}
+
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  font-size: 0.76rem;
+  color: var(--texto-fraco);
+}
+
+.legenda__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legenda__amostra {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--borda-suave);
+}
+
+.legenda__amostra--livre {
+  background: rgba(14, 32, 71, 0.8);
+  border-color: var(--ouro-600);
+}
+
+.legenda__amostra--ocupado {
+  background: rgba(251, 113, 133, 0.22);
+  border-color: rgba(251, 113, 133, 0.5);
+}
+
+/* Grade de horários ------------------------------------------------ */
+
+.grade-horarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.horario {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 12px 6px;
+  min-height: 58px;
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda-suave);
+  background: rgba(14, 32, 71, 0.34);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  transition: border-color var(--transicao), background var(--transicao), transform var(--transicao);
+}
+
+.horario:hover:not(:disabled) {
+  border-color: var(--ouro-500);
+  transform: translateY(-2px);
+}
+
+.horario--selecionado {
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  border-color: transparent;
+}
+
+.horario--indisponivel {
+  cursor: not-allowed;
+  background: rgba(251, 113, 133, 0.07);
+  border-color: rgba(251, 113, 133, 0.22);
+  color: var(--texto-fraco);
+}
+
+.horario--indisponivel .horario__hora {
+  text-decoration: line-through;
+  text-decoration-color: rgba(251, 113, 133, 0.6);
+}
+
+.horario__hora {
+  font-size: 1.02rem;
+}
+
+.horario__etiqueta {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.horario--selecionado .horario__etiqueta {
+  opacity: 0.7;
+}
+
+/* Formulário -------------------------------------------------------- */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.campo__rotulo {
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+  font-weight: 600;
+}
+
+.campo__entrada {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda-suave);
+  background: rgba(4, 10, 24, 0.6);
+  color: var(--texto);
+  font-size: 1rem;
+  transition: border-color var(--transicao), background var(--transicao);
+}
+
+.campo__entrada::placeholder {
+  color: var(--texto-fraco);
+}
+
+.campo__entrada:focus {
+  outline: none;
+  border-color: var(--ouro-500);
+  background: rgba(4, 10, 24, 0.85);
+}
+
+.campo__entrada--erro {
+  border-color: rgba(251, 113, 133, 0.6);
+}
+
+.campo__erro {
+  font-size: 0.8rem;
+  color: var(--erro);
+}
+
+.campo__dica {
+  font-size: 0.78rem;
+  color: var(--texto-fraco);
+}
+
+/* Revisão antes de confirmar ---------------------------------------- */
+
+.revisao {
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda);
+  background: rgba(226, 184, 92, 0.06);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.revisao__linha {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 7px;
+  font-size: 0.93rem;
+}
+
+.revisao__linha + .revisao__linha {
+  border-top: 1px dashed rgba(226, 184, 92, 0.18);
+}
+
+.revisao__rotulo {
+  color: var(--texto-suave);
+  flex-shrink: 0;
+}
+
+.revisao__valor {
+  font-weight: 600;
+  text-align: right;
+}
+
+.revisao__valor--destaque {
+  color: var(--ouro-400);
+  font-size: 1.05rem;
+}
+
+/* Confirmação ------------------------------------------------------- */
+
+.confirmado {
+  text-align: center;
+  padding-block: 8px;
+}
+
+.confirmado__selo {
+  width: 74px;
+  height: 74px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(74, 222, 128, 0.14);
+  color: var(--sucesso);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  animation: pulsar 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pulsar {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+.confirmado__titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 2rem;
+  color: var(--sucesso);
+}
+
+.confirmado__texto {
+  color: var(--texto-suave);
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+.confirmado__codigo {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px dashed var(--borda);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  color: var(--ouro-300);
+}
+
+.confirmado__cartao {
+  margin-top: 22px;
+  text-align: left;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  overflow: hidden;
+}
+
+.confirmado__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  background: rgba(22, 54, 140, 0.35);
+  border-bottom: 1px solid var(--borda-suave);
+}
+
+.confirmado__cabecalho img {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.confirmado__marca {
+  font-family: var(--fonte-titulo);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ouro-300);
+}
+
+.confirmado__corpo {
+  padding: 6px 18px 16px;
+}
+
+.confirmado__rodape {
+  padding: 14px 18px;
+  border-top: 1px solid var(--borda-suave);
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Estados vazios / carregando --------------------------------------- */
+
+.vazio {
+  text-align: center;
+  padding: 36px 20px;
+  color: var(--texto-suave);
+}
+
+.vazio__titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 1.4rem;
+  color: var(--texto);
+  margin-bottom: 6px;
+}
+
+.carregando-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.carregando-grade > div {
+  height: 58px;
+}
+
+.carregando-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.carregando-lista > div {
+  height: 74px;
+}
+
+/* Aviso de atualização em tempo real -------------------------------- */
+
+.toque-realtime {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: -20px -20px 16px;
+  padding: 10px 20px;
+  background: rgba(35, 82, 196, 0.22);
+  border-bottom: 1px solid rgba(35, 82, 196, 0.4);
+  font-size: 0.82rem;
+  color: #d8e2ff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

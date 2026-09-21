@@ -1,0 +1,45 @@
+# Dependencias
+node_modules/
+.pnp/
+.pnp.js
+
+# Build
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Ambiente / segredos (NUNCA versionar)
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.jks
+*.keystore
+service-account*.json
+google-services.json
+supabase/.temp/
+supabase/.branches/
+
+# Android
+android/.gradle/
+android/local.properties
+android/build/
+android/app/build/
+android/captures/
+android/.idea/
+android/app/release/
+*.apk
+*.aab
+
+# Editores / SO
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*

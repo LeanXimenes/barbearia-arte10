@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Arte 10 Admin</string>
+    <string name="canal_agendamentos">Novos agendamentos</string>
+    <string name="canal_agendamentos_descricao">Avisa quando um cliente marca um horário pelo site.</string>
+</resources>

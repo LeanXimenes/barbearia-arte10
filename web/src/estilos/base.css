@@ -1,0 +1,348 @@
+/* =====================================================================
+   BARBEARIA ARTE 10 — Fundamentos visuais
+   Paleta tirada da logo: azul profundo + dourado.
+   ===================================================================== */
+
+:root {
+  /* Azuis */
+  --azul-950: #040a18;
+  --azul-900: #070f22;
+  --azul-850: #0a1730;
+  --azul-800: #0e2047;
+  --azul-700: #123061;
+  --azul-600: #16368c;
+  --azul-500: #2352c4;
+
+  /* Dourados */
+  --ouro-200: #fbeecb;
+  --ouro-300: #f6dfa8;
+  --ouro-400: #efcf86;
+  --ouro-500: #e2b85c;
+  --ouro-600: #c9993c;
+
+  /* Texto */
+  --texto: #e9eefb;
+  --texto-suave: #9aa8c6;
+  --texto-fraco: #6c7a99;
+
+  /* Superfícies */
+  --fundo: var(--azul-950);
+  --superficie: rgba(14, 32, 71, 0.44);
+  --superficie-forte: #0b1428;
+  --borda: rgba(226, 184, 92, 0.18);
+  --borda-suave: rgba(154, 168, 198, 0.16);
+
+  /* Estados */
+  --sucesso: #4ade80;
+  --alerta: #fbbf24;
+  --erro: #fb7185;
+
+  /* Métricas */
+  --raio-sm: 10px;
+  --raio: 16px;
+  --raio-lg: 24px;
+  --largura: 1120px;
+  --gutter: 20px;
+
+  --sombra: 0 24px 60px -24px rgba(0, 0, 0, 0.85);
+  --sombra-suave: 0 8px 30px -12px rgba(0, 0, 0, 0.6);
+
+  --fonte-titulo: 'Cormorant Garamond', 'Times New Roman', serif;
+  --fonte: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --transicao: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  min-height: 100svh;
+  font-family: var(--fonte);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--texto);
+  background: var(--fundo);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Brilho suave de fundo, lembrando a luz de uma barbearia. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 520px at 50% -10%, rgba(22, 54, 140, 0.55), transparent 70%),
+    radial-gradient(700px 400px at 100% 0%, rgba(226, 184, 92, 0.07), transparent 65%);
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ouro-500);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Estruturas reaproveitadas                                           */
+/* ------------------------------------------------------------------ */
+
+.container {
+  width: 100%;
+  max-width: var(--largura);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  position: relative;
+  z-index: 1;
+}
+
+.secao {
+  padding-block: clamp(64px, 10vw, 118px);
+  position: relative;
+  z-index: 1;
+}
+
+.secao--alt {
+  background: linear-gradient(180deg, transparent, rgba(10, 23, 48, 0.55), transparent);
+}
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ouro-500);
+}
+
+.etiqueta::before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.titulo-secao {
+  margin-top: 18px;
+  font-size: clamp(2rem, 5.2vw, 3.2rem);
+}
+
+.subtitulo-secao {
+  margin-top: 14px;
+  max-width: 58ch;
+  color: var(--texto-suave);
+}
+
+/* Botões --------------------------------------------------------- */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 26px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: transform var(--transicao), box-shadow var(--transicao), background var(--transicao),
+    border-color var(--transicao), color var(--transicao), opacity var(--transicao);
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+.botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none !important;
+}
+
+.botao--ouro {
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  box-shadow: 0 14px 34px -16px rgba(226, 184, 92, 0.85);
+}
+
+.botao--ouro:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -16px rgba(226, 184, 92, 0.95);
+}
+
+.botao--contorno {
+  border-color: var(--borda);
+  color: var(--texto);
+  background: rgba(10, 23, 48, 0.5);
+}
+
+.botao--contorno:hover:not(:disabled) {
+  border-color: var(--ouro-500);
+  color: var(--ouro-300);
+  transform: translateY(-2px);
+}
+
+.botao--fantasma {
+  color: var(--texto-suave);
+  padding: 10px 16px;
+}
+
+.botao--fantasma:hover:not(:disabled) {
+  color: var(--ouro-300);
+}
+
+.botao--bloco {
+  width: 100%;
+}
+
+/* Cartões --------------------------------------------------------- */
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio);
+  backdrop-filter: blur(6px);
+}
+
+/* Avisos ---------------------------------------------------------- */
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--raio-sm);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+.aviso--erro {
+  background: rgba(251, 113, 133, 0.1);
+  border-color: rgba(251, 113, 133, 0.35);
+  color: #ffd9de;
+}
+
+.aviso--atencao {
+  background: rgba(251, 191, 36, 0.09);
+  border-color: rgba(251, 191, 36, 0.32);
+  color: #ffe9b8;
+}
+
+.aviso--info {
+  background: rgba(35, 82, 196, 0.14);
+  border-color: rgba(35, 82, 196, 0.4);
+  color: #d8e2ff;
+}
+
+.aviso__icone {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Carregando ------------------------------------------------------ */
+
+.girando {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.esqueleto {
+  border-radius: var(--raio-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(154, 168, 198, 0.07),
+    rgba(154, 168, 198, 0.16),
+    rgba(154, 168, 198, 0.07)
+  );
+  background-size: 200% 100%;
+  animation: brilhar 1.4s ease-in-out infinite;
+}
+
+@keyframes brilhar {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.apenas-leitores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

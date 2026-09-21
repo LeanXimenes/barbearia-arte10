@@ -1,0 +1,9 @@
+# Copie para "local.properties" (esse arquivo NAO vai para o git).
+#
+# Caminho do Android SDK:
+sdk.dir=C\:\Users\SEU_USUARIO\AppData\Local\Android\Sdk
+
+# Credenciais publicas do Supabase (as mesmas do site).
+# Somente a chave ANON. A service_role key nunca entra no aplicativo.
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_ANON_KEY=sua-anon-key-publica
