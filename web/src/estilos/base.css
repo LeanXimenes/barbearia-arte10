@@ -10,15 +10,15 @@
   --azul-850: #0a1730;
   --azul-800: #0e2047;
   --azul-700: #123061;
-  --azul-600: #16368c;
+  --azul-600: #013681;
   --azul-500: #2352c4;
 
   /* Dourados */
-  --ouro-200: #fbeecb;
-  --ouro-300: #f6dfa8;
-  --ouro-400: #efcf86;
-  --ouro-500: #e2b85c;
-  --ouro-600: #c9993c;
+  --ouro-200: #fdf3c8;
+  --ouro-300: #fcea9f;
+  --ouro-400: #fadf68;
+  --ouro-500: #e9c84f;
+  --ouro-600: #c9a437;
 
   /* Texto */
   --texto: #e9eefb;
@@ -29,7 +29,7 @@
   --fundo: var(--azul-950);
   --superficie: rgba(14, 32, 71, 0.44);
   --superficie-forte: #0b1428;
-  --borda: rgba(226, 184, 92, 0.18);
+  --borda: rgba(233, 200, 79, 0.18);
   --borda-suave: rgba(154, 168, 198, 0.16);
 
   /* Estados */
@@ -99,8 +99,8 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(900px 520px at 50% -10%, rgba(22, 54, 140, 0.55), transparent 70%),
-    radial-gradient(700px 400px at 100% 0%, rgba(226, 184, 92, 0.07), transparent 65%);
+    radial-gradient(900px 520px at 50% -10%, rgba(1, 54, 129, 0.55), transparent 70%),
+    radial-gradient(700px 400px at 100% 0%, rgba(233, 200, 79, 0.07), transparent 65%);
 }
 
 img,
@@ -223,12 +223,12 @@ h3 {
 .botao--ouro {
   background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
   color: #1a1204;
-  box-shadow: 0 14px 34px -16px rgba(226, 184, 92, 0.85);
+  box-shadow: 0 14px 34px -16px rgba(233, 200, 79, 0.85);
 }
 
 .botao--ouro:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 20px 40px -16px rgba(226, 184, 92, 0.95);
+  box-shadow: 0 20px 40px -16px rgba(233, 200, 79, 0.95);
 }
 
 .botao--contorno {

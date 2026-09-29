@@ -26,7 +26,7 @@ export function Cabecalho({ aoAgendar }: Props) {
     <header className={`cabecalho ${rolado ? 'cabecalho--rolado' : ''}`}>
       <div className="container cabecalho__linha">
         <a href="#inicio" className="marca" aria-label="Barbearia Arte 10 — início">
-          <img src="/logo-arte10.jpg" alt="" className="marca__logo" width={40} height={40} />
+          <img src="/logo-arte10-mini.jpg" alt="" className="marca__logo" width={40} height={40} />
           <span className="marca__texto">
             <span className="marca__nome">Arte 10</span>
             <span className="marca__sub">Barbearia</span>

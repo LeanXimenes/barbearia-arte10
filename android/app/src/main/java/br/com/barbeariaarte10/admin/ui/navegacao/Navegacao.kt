@@ -23,11 +23,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -37,16 +34,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.barbeariaarte10.admin.Grafo
 import br.com.barbeariaarte10.admin.notificacoes.sincronizarTokenPush
-import br.com.barbeariaarte10.admin.ui.componentes.CarregandoTela
 import br.com.barbeariaarte10.admin.ui.componentes.FaixaOffline
 import br.com.barbeariaarte10.admin.ui.telas.agenda.AgendaTela
 import br.com.barbeariaarte10.admin.ui.telas.clientes.ClientesTela
 import br.com.barbeariaarte10.admin.ui.telas.configuracoes.ConfiguracoesTela
 import br.com.barbeariaarte10.admin.ui.telas.historico.HistoricoTela
 import br.com.barbeariaarte10.admin.ui.telas.inicio.InicioTela
-import br.com.barbeariaarte10.admin.ui.telas.login.LoginTela
+import br.com.barbeariaarte10.admin.ui.telas.conexao.ConexaoTela
+import br.com.barbeariaarte10.admin.ui.telas.conexao.EstadoSessao
+import br.com.barbeariaarte10.admin.ui.telas.conexao.SessaoViewModel
 import br.com.barbeariaarte10.admin.ui.telas.servicos.ServicosTela
 import br.com.barbeariaarte10.admin.ui.tema.AzulNoite
 import br.com.barbeariaarte10.admin.ui.tema.Ouro
@@ -76,37 +76,51 @@ private val ABAS = listOf(
     Aba(Rota.Configuracoes, "Ajustes", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
+/**
+ * Raiz do aplicativo. Não existe tela de login: enquanto conecta mostra a
+ * logo; conectado, abre direto na agenda do dia.
+ *
+ * [dataPedida] chega de uma notificação tocada ("2026-09-21") e faz o app
+ * abrir a Agenda naquele dia; [aoConsumirData] avisa que já foi usada.
+ */
 @Composable
-fun RaizApp(dataInicialDaAgenda: String? = null) {
-    val autenticado by Grafo.autenticacao.autenticado.collectAsState(initial = false)
-    val carregandoSessao by Grafo.autenticacao.carregandoSessao.collectAsState(initial = true)
+fun RaizApp(
+    dataPedida: String?,
+    aoConsumirData: () -> Unit,
+    sessao: SessaoViewModel = viewModel(),
+) {
+    val estado by sessao.estado.collectAsStateWithLifecycle()
+    val conectado = estado is EstadoSessao.Conectado
 
-    // Uma vez autenticado, garante que este aparelho receba os pushes.
-    LaunchedEffect(autenticado) {
-        if (autenticado) sincronizarTokenPush()
+    // Uma vez conectado, garante que este aparelho receba os pushes.
+    LaunchedEffect(conectado) {
+        if (conectado) sincronizarTokenPush()
     }
 
-    when {
-        carregandoSessao -> CarregandoTela()
-        !autenticado -> LoginTela()
-        else -> AppAutenticado(dataInicialDaAgenda)
+    if (conectado) {
+        AppConectado(dataPedida, aoConsumirData)
+    } else {
+        ConexaoTela(estado = estado, aoTentarNovamente = sessao::conectar)
     }
 }
 
 @Composable
-private fun AppAutenticado(dataInicialDaAgenda: String?) {
+private fun AppConectado(dataPedida: String?, aoConsumirData: () -> Unit) {
     val navegador = rememberNavController()
     val entradaAtual by navegador.currentBackStackEntryAsState()
     val rotaAtual = entradaAtual?.destination
 
-    val online by Grafo.conectividade.observar()
-        .collectAsState(initial = Grafo.conectividade.estaOnline())
+    // O fluxo é lembrado: recriá-lo a cada recomposição registraria e
+    // removeria o callback de rede o tempo todo.
+    val fluxoConexao = remember { Grafo.conectividade.observar() }
+    val online by fluxoConexao.collectAsStateWithLifecycle(initialValue = Grafo.conectividade.estaOnline())
 
-    var dataPendente by remember { mutableStateOf(dataInicialDaAgenda) }
-
-    LaunchedEffect(dataInicialDaAgenda) {
-        if (dataInicialDaAgenda != null) {
-            navegador.navigate(Rota.Agenda.caminho)
+    LaunchedEffect(dataPedida) {
+        if (dataPedida != null && rotaAtual?.route != Rota.Agenda.caminho) {
+            navegador.navigate(Rota.Agenda.caminho) {
+                popUpTo(navegador.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
         }
     }
 
@@ -160,13 +174,11 @@ private fun AppAutenticado(dataInicialDaAgenda: String?) {
                     )
                 }
                 composable(Rota.Agenda.caminho) {
-                    AgendaTela(online = online, dataInicial = dataPendente)
-                    // Consome o "pule para esta data" da notificação uma única
-                    // vez — fora da composição, para não alterar estado durante
-                    // o desenho da tela.
-                    LaunchedEffect(dataPendente) {
-                        if (dataPendente != null) dataPendente = null
-                    }
+                    AgendaTela(
+                        online = online,
+                        dataInicial = dataPedida,
+                        aoUsarDataInicial = aoConsumirData,
+                    )
                 }
                 composable(Rota.Clientes.caminho) {
                     ClientesTela(online = online)
@@ -187,4 +199,3 @@ private fun AppAutenticado(dataInicialDaAgenda: String?) {
         }
     }
 }
-

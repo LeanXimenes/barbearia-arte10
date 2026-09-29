@@ -1,0 +1,8 @@
+# Finais de linha: o gradlew precisa de LF, o gradlew.bat precisa de CRLF.
+* text=auto
+android/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary

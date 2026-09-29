@@ -1,5 +1,6 @@
 package br.com.barbeariaarte10.admin.dados.repositorio
 
+import br.com.barbeariaarte10.admin.Grafo
 import br.com.barbeariaarte10.admin.core.MSG_FALHA_SALVAR
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.core.Supabase
@@ -19,7 +20,9 @@ import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
@@ -142,10 +145,13 @@ class AgendaRepositorio {
         }
 
     /**
-     * Realtime (item 18): emite sempre que um agendamento ou bloqueio
-     * muda, para a tela recarregar sozinha sem o proprietário fazer nada.
+     * Realtime (item 18): emite sempre que um agendamento ou bloqueio muda,
+     * para as telas recarregarem sozinhas.
+     *
+     * Um único canal é compartilhado por todas as telas (shareIn). Abrir dois
+     * canais com o mesmo nome faria um derrubar o outro.
      */
-    fun mudancasNaAgenda(): Flow<Unit> = channelFlow {
+    private val mudancas: Flow<Unit> = channelFlow {
         val canal = supabase.channel("arte10-admin-agenda")
 
         // Os fluxos precisam ser criados ANTES do subscribe().
@@ -166,5 +172,7 @@ class AgendaRepositorio {
                 runCatching { supabase.realtime.removeChannel(canal) }
             }
         }
-    }
+    }.shareIn(Grafo.escopoApp, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000))
+
+    fun mudancasNaAgenda(): Flow<Unit> = mudancas
 }

@@ -1,7 +1,6 @@
 package br.com.barbeariaarte10.admin.ui.telas.agenda
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import br.com.barbeariaarte10.admin.core.Formato
 import br.com.barbeariaarte10.admin.dados.modelo.ItemAgenda
 import br.com.barbeariaarte10.admin.ui.componentes.Etiqueta
@@ -161,7 +161,7 @@ private fun DetalheAgendamento(
                 onClick = {
                     runCatching {
                         contexto.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            Intent(Intent.ACTION_VIEW, link.toUri())
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
                     }

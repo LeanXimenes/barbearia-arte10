@@ -1,5 +1,6 @@
 package br.com.barbeariaarte10.admin.dados.repositorio
 
+import br.com.barbeariaarte10.admin.BuildConfig
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.core.Supabase
 import br.com.barbeariaarte10.admin.core.executar
@@ -8,61 +9,79 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.from
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Login do proprietário.
+ * Conexão do aplicativo com o Supabase — SEM tela de login.
  *
- * Entrar com e-mail e senha não basta: o usuário precisa existir em
- * public.administradores. Quem não estiver lá é desconectado na hora e
- * continua sem enxergar nada, porque o RLS do banco também recusa
- * (item 20).
+ * O app entra sozinho com uma conta dedicada da barbearia, configurada no
+ * momento da compilação (BARBEIRO_EMAIL / BARBEIRO_SENHA em
+ * local.properties). A sessão fica salva no aparelho e é renovada
+ * automaticamente, então o barbeiro só precisa abrir o app.
+ *
+ * Continua valendo no banco: essa conta só enxerga alguma coisa porque
+ * está cadastrada em public.administradores. Para cortar o acesso de um
+ * aparelho perdido basta desativá-la lá (efeito imediato pelo RLS).
  */
 class AutenticacaoRepositorio {
 
     private val supabase = Supabase.cliente
 
-    /** true quando existe sessão válida. */
-    val autenticado: Flow<Boolean> =
-        supabase.auth.sessionStatus.map { it is SessionStatus.Authenticated }
+    val status: StateFlow<SessionStatus> get() = supabase.auth.sessionStatus
 
-    val carregandoSessao: Flow<Boolean> =
-        supabase.auth.sessionStatus.map { it is SessionStatus.Initializing }
+    val contaConfigurada: Boolean =
+        BuildConfig.BARBEIRO_EMAIL.isNotBlank() && BuildConfig.BARBEIRO_SENHA.isNotBlank()
 
     fun emailAtual(): String? = supabase.auth.currentUserOrNull()?.email
 
-    suspend fun entrar(email: String, senha: String): Resultado<Administrador> {
-        val login = executar(mensagemPadrao = "E-mail ou senha inválidos.") {
+    suspend fun conectar(): Resultado<Administrador> {
+        if (!Supabase.configurado) {
+            return Resultado.Falha(
+                "O app foi gerado sem o endereço do Supabase. " +
+                    "Preencha SUPABASE_URL e SUPABASE_ANON_KEY no local.properties e gere o app de novo.",
+            )
+        }
+        if (!contaConfigurada) {
+            return Resultado.Falha(
+                "O app foi gerado sem a conta da barbearia. " +
+                    "Preencha BARBEIRO_EMAIL e BARBEIRO_SENHA no local.properties e gere o app de novo.",
+            )
+        }
+
+        val login = executar(
+            mensagemPadrao = "A conta configurada no app não foi aceita. " +
+                "Confira BARBEIRO_EMAIL e BARBEIRO_SENHA e se o usuário existe no Supabase.",
+        ) {
             supabase.auth.signInWith(Email) {
-                this.email = email.trim()
-                this.password = senha
+                email = BuildConfig.BARBEIRO_EMAIL
+                password = BuildConfig.BARBEIRO_SENHA
             }
         }
-
         if (login is Resultado.Falha) return login
 
-        val perfil = perfilAdministrador()
-        if (perfil is Resultado.Falha) {
-            runCatching { supabase.auth.signOut() }
-            return perfil
+        return when (val perfil = perfilAdministrador()) {
+            is Resultado.Falha -> {
+                runCatching { supabase.auth.signOut() }
+                perfil
+            }
+            is Resultado.Sucesso -> {
+                val administrador = perfil.dado
+                if (administrador == null || !administrador.ativo) {
+                    runCatching { supabase.auth.signOut() }
+                    Resultado.Falha(
+                        "A conta do app não está liberada como administradora da barbearia " +
+                            "(tabela administradores no Supabase).",
+                    )
+                } else {
+                    Resultado.Sucesso(administrador)
+                }
+            }
         }
-
-        val administrador = (perfil as Resultado.Sucesso).dado
-        if (administrador == null || !administrador.ativo) {
-            runCatching { supabase.auth.signOut() }
-            return Resultado.Falha("Esta conta não tem acesso administrativo à Barbearia Arte 10.")
-        }
-
-        return Resultado.Sucesso(administrador)
     }
 
-    /**
-     * Lê o vínculo administrativo do usuário logado.
-     * A policy "administradores_proprio" só devolve a própria linha.
-     */
-    suspend fun perfilAdministrador(): Resultado<Administrador?> = executar(
-        mensagemPadrao = "Não foi possível confirmar suas permissões."
+    /** A policy "administradores_proprio" só devolve a própria linha. */
+    private suspend fun perfilAdministrador(): Resultado<Administrador?> = executar(
+        mensagemPadrao = "Não foi possível confirmar as permissões da conta do app.",
     ) {
         val id = supabase.auth.currentUserOrNull()?.id ?: return@executar null
         supabase.from("administradores")
@@ -71,9 +90,5 @@ class AutenticacaoRepositorio {
                 limit(1)
             }
             .decodeSingleOrNull<Administrador>()
-    }
-
-    suspend fun sair(): Resultado<Unit> = executar(mensagemPadrao = "Não foi possível sair.") {
-        supabase.auth.signOut()
     }
 }

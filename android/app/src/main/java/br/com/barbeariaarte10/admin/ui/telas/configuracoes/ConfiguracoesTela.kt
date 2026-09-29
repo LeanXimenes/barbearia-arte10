@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -136,9 +135,6 @@ class ConfiguracoesViewModel : ViewModel() {
         }
     }
 
-    fun sair() {
-        viewModelScope.launch { Grafo.autenticacao.sair() }
-    }
 }
 
 @Composable
@@ -260,22 +256,13 @@ fun ConfiguracoesTela(
             }
         }
 
-        // ------------------------------------------------------- sair
+        // -------------------------------------------------- conexão
         item {
             Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = modelo::sair,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(999.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Erro),
-            ) {
-                Icon(Icons.Outlined.Logout, contentDescription = null, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Sair da conta")
-            }
-            Spacer(Modifier.height(10.dp))
             Text(
-                Grafo.autenticacao.emailAtual().orEmpty(),
+                "O app entra sozinho com a conta da barbearia" +
+                    (Grafo.autenticacao.emailAtual()?.let { " ($it)" } ?: "") +
+                    ". Não é preciso fazer login.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextoFraco,
             )

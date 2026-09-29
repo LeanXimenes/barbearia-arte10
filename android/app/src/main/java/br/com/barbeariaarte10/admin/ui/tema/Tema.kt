@@ -24,12 +24,12 @@ val AzulProfundo = Color(0xFF040A18)
 val AzulNoite = Color(0xFF070F22)
 val AzulCartao = Color(0xFF0C1730)
 val AzulElevado = Color(0xFF122345)
-val AzulLogo = Color(0xFF16368C)
+val AzulLogo = Color(0xFF013681)
 val AzulClaro = Color(0xFF2352C4)
 
-val Ouro = Color(0xFFE2B85C)
-val OuroClaro = Color(0xFFF6DFA8)
-val OuroEscuro = Color(0xFFC9993C)
+val Ouro = Color(0xFFFADF68)
+val OuroClaro = Color(0xFFFCEA9F)
+val OuroEscuro = Color(0xFFC9A437)
 
 val Texto = Color(0xFFE9EEFB)
 val TextoSuave = Color(0xFF9AA8C6)
@@ -64,7 +64,7 @@ private val EsquemaEscuro = darkColorScheme(
     surfaceContainerHigh = AzulElevado,
     surfaceContainerHighest = AzulElevado,
 
-    outline = Color(0x33E2B85C),
+    outline = Color(0x33FADF68),
     outlineVariant = Color(0x1F9AA8C6),
 
     error = Erro,

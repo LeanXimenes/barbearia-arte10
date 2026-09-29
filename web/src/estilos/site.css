@@ -81,7 +81,7 @@
 
 .navegacao__item:hover {
   color: var(--ouro-300);
-  background: rgba(226, 184, 92, 0.08);
+  background: rgba(233, 200, 79, 0.08);
 }
 
 .cabecalho__acao {
@@ -201,7 +201,7 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: rgba(226, 184, 92, 0.12);
+  background: rgba(233, 200, 79, 0.12);
   color: var(--ouro-400);
   flex-shrink: 0;
 }
@@ -270,7 +270,7 @@
 .servico__numero {
   font-family: var(--fonte-titulo);
   font-size: 1.5rem;
-  color: rgba(226, 184, 92, 0.42);
+  color: rgba(233, 200, 79, 0.42);
 }
 
 .servico__duracao {
@@ -349,7 +349,7 @@
 }
 
 .horarios-lista__item--hoje {
-  background: rgba(226, 184, 92, 0.07);
+  background: rgba(233, 200, 79, 0.07);
 }
 
 .horarios-lista__dia {

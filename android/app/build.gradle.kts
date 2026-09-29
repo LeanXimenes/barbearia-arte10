@@ -5,32 +5,46 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.google.services)
 }
 
-// As credenciais do Supabase vêm de local.properties (fora do git) ou de
-// variáveis de ambiente, nunca escritas dentro do código-fonte.
+// O push (Firebase) só é ligado quando o google-services.json existe.
+// Sem ele o app compila e funciona normalmente — apenas não recebe push.
+val temFirebase = file("google-services.json").exists()
+if (temFirebase) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+// Credenciais vêm de local.properties (fora do git) ou de variáveis de
+// ambiente — nunca escritas no código-fonte.
 val propriedadesLocais = Properties().apply {
     val arquivo = rootProject.file("local.properties")
     if (arquivo.exists()) arquivo.inputStream().use { load(it) }
 }
 
-fun segredo(chave: String, padrao: String = ""): String =
-    (propriedadesLocais.getProperty(chave) ?: System.getenv(chave) ?: padrao)
+fun segredo(chave: String): String =
+    (propriedadesLocais.getProperty(chave) ?: System.getenv(chave) ?: "").trim()
+
+/** Gera um literal Java seguro mesmo se a senha tiver aspas ou barras. */
+fun literal(valor: String): String =
+    "\"" + valor.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "br.com.barbeariaarte10.admin"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "br.com.barbeariaarte10.admin"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.1.0"
 
-        buildConfigField("String", "SUPABASE_URL", "\"${segredo("SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${segredo("SUPABASE_ANON_KEY")}\"")
+        buildConfigField("String", "SUPABASE_URL", literal(segredo("SUPABASE_URL")))
+        buildConfigField("String", "SUPABASE_ANON_KEY", literal(segredo("SUPABASE_ANON_KEY")))
+        // Conta dedicada do app: ele entra sozinho, sem tela de login.
+        buildConfigField("String", "BARBEIRO_EMAIL", literal(segredo("BARBEIRO_EMAIL")))
+        buildConfigField("String", "BARBEIRO_SENHA", literal(segredo("BARBEIRO_SENHA")))
+        buildConfigField("boolean", "PUSH_CONFIGURADO", temFirebase.toString())
 
         vectorDrawables.useSupportLibrary = true
     }
@@ -52,7 +66,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        isCoreLibraryDesugaringEnabled = false
     }
 
     kotlinOptions {
@@ -74,12 +87,12 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.splashscreen)
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.datastore.preferences)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

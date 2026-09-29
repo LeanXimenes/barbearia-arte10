@@ -44,7 +44,7 @@ export function Confirmacao({ agendamento, barbearia }: Props) {
 
       <div className="confirmado__cartao">
         <div className="confirmado__cabecalho">
-          <img src="/logo-arte10.jpg" alt="" width={38} height={38} />
+          <img src="/logo-arte10-mini.jpg" alt="" width={38} height={38} />
           <span className="confirmado__marca">{barbearia.nome || 'Barbearia Arte 10'}</span>
         </div>
 

@@ -1,9 +1,13 @@
 package br.com.barbeariaarte10.admin
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import br.com.barbeariaarte10.admin.core.Conectividade
 import br.com.barbeariaarte10.admin.dados.repositorio.AgendaRepositorio
 import br.com.barbeariaarte10.admin.dados.repositorio.AutenticacaoRepositorio
@@ -41,10 +45,15 @@ class App : Application() {
  * Injeção de dependências simples e explícita.
  * O aplicativo é pequeno o bastante para não precisar de um framework.
  */
+@SuppressLint("StaticFieldLeak")
 object Grafo {
 
+    // É o applicationContext (vive o processo inteiro), não uma Activity: não vaza.
     lateinit var contexto: Context
         private set
+
+    /** Escopo que vive enquanto o processo do app vive (canais realtime compartilhados). */
+    val escopoApp: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val autenticacao: AutenticacaoRepositorio by lazy { AutenticacaoRepositorio() }
     val agenda: AgendaRepositorio by lazy { AgendaRepositorio() }

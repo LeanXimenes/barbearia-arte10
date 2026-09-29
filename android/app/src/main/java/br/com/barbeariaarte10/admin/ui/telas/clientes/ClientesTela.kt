@@ -58,6 +58,7 @@ data class EstadoClientes(
     val erro: String? = null,
 )
 
+@OptIn(FlowPreview::class)
 class ClientesViewModel : ViewModel() {
 
     private val _estado = MutableStateFlow(EstadoClientes())
@@ -65,7 +66,6 @@ class ClientesViewModel : ViewModel() {
 
     private val termo = MutableStateFlow("")
 
-    @OptIn(FlowPreview::class)
     init {
         viewModelScope.launch {
             termo.debounce(300).distinctUntilChanged().collect { buscar(it) }

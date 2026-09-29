@@ -330,7 +330,7 @@ export function ModalAgendamento({
             </button>
           ) : (
             <img
-              src="/logo-arte10.jpg"
+              src="/logo-arte10-mini.jpg"
               alt=""
               width={38}
               height={38}

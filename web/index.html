@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#050c1f" />
+    <meta name="theme-color" content="#040a18" />
 
     <title>Barbearia Arte 10 | Agende seu horário online</title>
     <meta
@@ -11,17 +11,26 @@
       content="Barbearia Arte 10 — corte, barba, pezinho e sobrancelha com hora marcada. Agende seu horário online em poucos segundos."
     />
 
-    <link rel="icon" type="image/jpeg" href="/logo-arte10.jpg" />
-    <link rel="apple-touch-icon" href="/logo-arte10.jpg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
 
+    <!-- __SITE_URL__ é trocado pelo endereço real do site no build (vite.config.ts).
+         WhatsApp e Facebook exigem URL absoluta na imagem de compartilhamento. -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Barbearia Arte 10" />
+    <meta property="og:site_name" content="Barbearia Arte 10" />
+    <meta property="og:title" content="Barbearia Arte 10 — agende seu horário" />
     <meta
       property="og:description"
-      content="Corte, barba, pezinho e sobrancelha com hora marcada. Agende online."
+      content="Corte, barba, pezinho e sobrancelha com hora marcada. Veja os horários livres e agende online."
     />
-    <meta property="og:image" content="/logo-arte10.jpg" />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:image" content="__SITE_URL__/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -31,6 +40,11 @@
     />
   </head>
   <body>
+    <noscript>
+      <p style="padding: 24px; font-family: sans-serif; color: #e9eefb; background: #040a18">
+        Ative o JavaScript para agendar seu horário na Barbearia Arte 10.
+      </p>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

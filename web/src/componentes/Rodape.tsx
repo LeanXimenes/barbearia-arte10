@@ -23,7 +23,7 @@ export function Rodape({ config, funcionamento }: Props) {
         <div className="rodape__grade">
           <div>
             <div className="marca" style={{ marginBottom: 16 }}>
-              <img src="/logo-arte10.jpg" alt="" className="marca__logo" width={40} height={40} />
+              <img src="/logo-arte10-mini.jpg" alt="" className="marca__logo" width={40} height={40} />
               <span className="marca__texto">
                 <span className="marca__nome">Arte 10</span>
                 <span className="marca__sub">Barbearia</span>

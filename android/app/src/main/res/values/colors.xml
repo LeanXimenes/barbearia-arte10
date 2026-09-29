@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Paleta tirada da logo da Barbearia Arte 10 -->
     <color name="azul_profundo">#FF040A18</color>
-    <color name="azul_logo">#FF16368C</color>
-    <color name="ouro">#FFE2B85C</color>
-    <color name="branco">#FFE9EEFB</color>
+    <color name="azul_logo">#FF013681</color>
+    <color name="ouro">#FFFADF68</color>
 </resources>

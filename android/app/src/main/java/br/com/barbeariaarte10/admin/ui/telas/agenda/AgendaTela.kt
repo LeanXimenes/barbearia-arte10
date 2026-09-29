@@ -59,11 +59,18 @@ import kotlinx.datetime.LocalDate
 fun AgendaTela(
     online: Boolean,
     dataInicial: String? = null,
+    aoUsarDataInicial: () -> Unit = {},
     modelo: AgendaViewModel = viewModel(),
 ) {
     val estado by modelo.estado.collectAsStateWithLifecycle()
 
-    LaunchedEffect(dataInicial) { modelo.irParaTexto(dataInicial) }
+    // Dia vindo de uma notificação tocada: aplica uma vez e avisa que usou.
+    LaunchedEffect(dataInicial) {
+        if (dataInicial != null) {
+            modelo.irParaTexto(dataInicial)
+            aoUsarDataInicial()
+        }
+    }
     LaunchedEffect(online) { if (online) modelo.carregar(silencioso = true) }
 
     Column(Modifier.fillMaxWidth()) {
