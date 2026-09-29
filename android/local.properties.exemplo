@@ -1,7 +1,7 @@
 # Copie este arquivo para "local.properties" (esse arquivo NAO vai para o git).
 
 # Caminho do Android SDK (o Android Studio costuma preencher sozinho):
-sdk.dir=C\:\Users\SEU_USUARIO\AppData\Local\Android\Sdk
+sdk.dir=C\:\\Users\\SEU_USUARIO\\AppData\\Local\\Android\\Sdk
 
 # Endereco e chave PUBLICA do Supabase (as mesmas do site).
 # Somente a chave PUBLICA (publishable ou anon). A secret/service_role nunca entra no aplicativo.

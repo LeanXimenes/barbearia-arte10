@@ -85,11 +85,48 @@ test('dados_da_barbearia.sql corrige um banco instalado com os dados de exemplo'
       intervalo_inicio = null, intervalo_fim = null where dia_semana = 0;
     update public.config_horarios set aberto = true, abre = '09:00', fecha = '19:00',
       intervalo_inicio = '12:00', intervalo_fim = '13:30' where dia_semana between 1 and 5;
+
+    -- Catálogo antigo: sem "Só raspar", textos e preços velhos, e dois
+    -- serviços que saíram da lista (um deles já com cliente agendado).
+    delete from public.servicos where nome = 'Só raspar';
+    update public.servicos set descricao = 'texto antigo', preco = preco + 1, ordem = ordem + 10;
+    insert into public.servicos (nome, preco, duracao_minutos, ordem)
+    values ('Corte + Barba', 60, 60, 3), ('Hidratação', 40, 30, 6);
   `)
+  const combo = (await db.query("select id from public.servicos where nome = 'Corte + Barba'")).rows[0].id
+  const dia = (
+    await db.query(
+      `select g::date as d from generate_series((now() at time zone 'America/Sao_Paulo')::date + 1,
+         (now() at time zone 'America/Sao_Paulo')::date + 10, interval '1 day') g
+        where extract(dow from g) between 1 and 4 order by g limit 1`
+    )
+  ).rows[0].d
+  const reserva = await db.query(
+    "select public.criar_agendamento($1, $2, '10:00', 'Cliente do Combo', '17900000020', null) as r",
+    [combo, dia]
+  )
+  assert.equal(reserva.rows[0].r.ok, true, 'não conseguiu agendar o combo antigo')
 
   const corrigir = readFileSync(join(aqui, '..', 'dados_da_barbearia.sql'), 'utf8')
   await db.exec(corrigir)
   await db.exec(corrigir) // pode rodar de novo
+
+  const ativos = (
+    await db.query(
+      'select nome, descricao, preco::float as preco, duracao_minutos from public.servicos where ativo order by ordem'
+    )
+  ).rows
+  assert.deepEqual(ativos, [
+    { nome: 'Corte de cabelo', descricao: 'Corte personalizado com acabamento completo.', preco: 35, duracao_minutos: 35 },
+    { nome: 'Barba completa', descricao: 'Modelagem e acabamento para deixar a barba alinhada.', preco: 30, duracao_minutos: 30 },
+    { nome: 'Pezinho', descricao: 'Acabamento limpo e preciso para completar o visual.', preco: 15, duracao_minutos: 20 },
+    { nome: 'Só raspar', descricao: 'Apenas raspagem.', preco: 10, duracao_minutos: 20 },
+    { nome: 'Sobrancelha', descricao: 'Acabamento simples para deixar o olhar alinhado.', preco: 5, duracao_minutos: 10 },
+  ])
+  const saiu = (await db.query("select nome from public.servicos where not ativo")).rows.map((r) => r.nome)
+  assert.deepEqual(saiu, ['Corte + Barba'], 'o combo com cliente deveria ficar só desativado')
+  const cliente = (await db.query('select servico_nome, servico_preco::float as preco from public.agendamentos')).rows
+  assert.deepEqual(cliente, [{ servico_nome: 'Corte + Barba', preco: 60 }], 'mexeu no agendamento do cliente')
 
   const cfg = (await db.query('select * from public.config_barbearia')).rows[0]
   assert.equal(cfg.endereco, 'Rua Joaquim Iglesias, 889')

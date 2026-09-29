@@ -2311,11 +2311,11 @@ on conflict (dia_semana) do nothing;
 -- ---------------------------------------------------------------------
 insert into public.servicos (nome, descricao, preco, duracao_minutos, ativo, ordem)
 values
-  ('Corte de cabelo', 'Corte personalizado com acabamento completo na máquina, tesoura e navalha.', 35.00, 35, true, 1),
-  ('Barba completa',  'Toalha quente, modelagem e acabamento para deixar a barba alinhada.',        30.00, 30, true, 2),
-  ('Corte + Barba',   'O combo completo: corte finalizado e barba modelada na mesma visita.',       60.00, 60, true, 3),
-  ('Pezinho',         'Acabamento limpo e preciso para manter o visual entre um corte e outro.',    15.00, 20, true, 4),
-  ('Sobrancelha',     'Limpeza e alinhamento das sobrancelhas na navalha.',                          5.00, 10, true, 5)
+  ('Corte de cabelo', 'Corte personalizado com acabamento completo.',         35.00, 35, true, 1),
+  ('Barba completa',  'Modelagem e acabamento para deixar a barba alinhada.', 30.00, 30, true, 2),
+  ('Pezinho',         'Acabamento limpo e preciso para completar o visual.',  15.00, 20, true, 3),
+  ('Só raspar',       'Apenas raspagem.',                                     10.00, 20, true, 4),
+  ('Sobrancelha',     'Acabamento simples para deixar o olhar alinhado.',      5.00, 10, true, 5)
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------

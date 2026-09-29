@@ -147,7 +147,10 @@ await db.query('insert into public.administradores (user_id, nome) values ($1, $
 
 const CORTE = await servico('Corte de cabelo')
 const BARBA = await servico('Barba completa')
-const COMBO = await servico('Corte + Barba')
+// Serviço longo só dos testes: o catálogo real não tem nenhum de 60 min.
+const COMBO = await uma(
+  "insert into public.servicos (nome, preco, duracao_minutos, ordem) values ('Combo dos testes', 60, 60, 99) returning *"
+)
 
 const DIA = await proximoDiaUtil(1)
 const DIA2 = await proximoDiaUtil(2)
