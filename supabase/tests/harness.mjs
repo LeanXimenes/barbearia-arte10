@@ -13,7 +13,24 @@ const DIR_MIGRACOES = join(aqui, '..', 'migrations')
 const ARQ_SEED = join(aqui, '..', 'seed.sql')
 const ARQ_SHIM = join(aqui, 'auth_shim.sql')
 
-export async function criarBanco({ comSeed = true } = {}) {
+// Agenda FIXA dos testes, independente dos horários reais da barbearia
+// (que ficam no seed e podem mudar a qualquer momento).
+const AGENDA_DOS_TESTES = `
+  update public.config_horarios
+     set aberto = false, abre = null, fecha = null, intervalo_inicio = null, intervalo_fim = null
+   where dia_semana = 0;
+  update public.config_horarios
+     set aberto = true, abre = '09:00', fecha = '19:00', intervalo_inicio = '12:00', intervalo_fim = '13:30'
+   where dia_semana between 1 and 4;
+  update public.config_horarios
+     set aberto = true, abre = '09:00', fecha = '20:00', intervalo_inicio = '12:00', intervalo_fim = '13:30'
+   where dia_semana = 5;
+  update public.config_horarios
+     set aberto = true, abre = '08:00', fecha = '18:00', intervalo_inicio = null, intervalo_fim = null
+   where dia_semana = 6;
+`
+
+export async function criarBanco({ comSeed = true, agendaDeTeste = true } = {}) {
   const db = await PGlite.create()
 
   await db.exec(await readFile(ARQ_SHIM, 'utf8'))
@@ -30,6 +47,7 @@ export async function criarBanco({ comSeed = true } = {}) {
 
   if (comSeed) {
     await db.exec(await readFile(ARQ_SEED, 'utf8'))
+    if (agendaDeTeste) await db.exec(AGENDA_DOS_TESTES)
   }
 
   return db

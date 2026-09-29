@@ -53,28 +53,27 @@ Em **Project Settings → API Keys**:
 
 ## 3. Dados da barbearia
 
-O seed deixa contato e endereço em branco de propósito (para não publicar um
-endereço inventado). Preencha pelo aplicativo (**Ajustes → Editar dados**) ou
-no SQL Editor:
+O instalador já vem com os dados reais (arquivo `supabase/seed.sql`):
+
+| | |
+|---|---|
+| Endereço | Rua Joaquim Iglesias, 889 — Santa Albertina/SP |
+| WhatsApp | (17) 99731-3480 |
+| Instagram | @aquiles.hiroshi |
+| Segunda a sexta | 08:00 — 12:30 |
+| Sábado e domingo | 09:00 — 23:00 |
+
+Para mudar depois: pelo aplicativo (**Ajustes**) ou no SQL Editor:
 
 ```sql
 update public.config_barbearia set
-  telefone_whatsapp = '17999999999',   -- só números, com DDD
-  instagram         = 'barbeariaarte10',
-  endereco          = 'Rua Exemplo, 123 - Centro',
-  cidade            = 'Sua Cidade',
+  telefone_whatsapp = '17997313480',   -- só números, com DDD
+  instagram         = 'aquiles.hiroshi',
+  endereco          = 'Rua Joaquim Iglesias, 889',
+  cidade            = 'Santa Albertina',
   uf                = 'SP'
 where id;
 ```
-
-Horários de funcionamento iniciais (editáveis no app, em **Ajustes**):
-
-| Dia | Expediente | Intervalo |
-|---|---|---|
-| Segunda a quinta | 09:00 — 19:00 | 12:00 — 13:30 |
-| Sexta | 09:00 — 20:00 | 12:00 — 13:30 |
-| Sábado | 08:00 — 18:00 | — |
-| Domingo | fechado | — |
 
 ---
 

@@ -6,14 +6,14 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- >>> EDITE AQUI OS DADOS DA BARBEARIA <<<
--- (tambem editavel depois pela tela Configuracoes do aplicativo)
+-- DADOS DA BARBEARIA
+-- (depois, edite pela tela Ajustes do aplicativo)
 -- ---------------------------------------------------------------------
 insert into public.config_barbearia (
   id, nome, fuso,
-  telefone_whatsapp,   -- ex.: '5517997313480' (somente digitos, com DDI)
-  instagram,           -- ex.: 'barbeariaarte10'
-  endereco,            -- ex.: 'Rua Exemplo, 123 - Centro'
+  telefone_whatsapp,   -- somente digitos, com DDD
+  instagram,           -- sem o @
+  endereco,
   cidade, uf,
   mapa_url,
   granularidade_minutos, antecedencia_minima_minutos,
@@ -21,11 +21,11 @@ insert into public.config_barbearia (
 )
 values (
   true, 'Barbearia Arte 10', 'America/Sao_Paulo',
-  null,
-  null,
-  null,
-  null, null,
-  null,
+  '17997313480',
+  'aquiles.hiroshi',
+  'Rua Joaquim Iglesias, 889',
+  'Santa Albertina', 'SP',
+  null,                -- vazio = o site monta o link do Google Maps pelo endereco
   15, 30, 60, 3
 )
 on conflict (id) do nothing;
@@ -36,13 +36,13 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------
 insert into public.config_horarios (dia_semana, aberto, abre, fecha, intervalo_inicio, intervalo_fim)
 values
-  (0, false, null,     null,     null,     null),      -- domingo: fechado
-  (1, true,  '09:00',  '19:00',  '12:00',  '13:30'),   -- segunda
-  (2, true,  '09:00',  '19:00',  '12:00',  '13:30'),   -- terca
-  (3, true,  '09:00',  '19:00',  '12:00',  '13:30'),   -- quarta
-  (4, true,  '09:00',  '19:00',  '12:00',  '13:30'),   -- quinta
-  (5, true,  '09:00',  '20:00',  '12:00',  '13:30'),   -- sexta
-  (6, true,  '08:00',  '18:00',  null,     null)       -- sabado
+  (0, true,  '09:00',  '23:00',  null,     null),      -- domingo
+  (1, true,  '08:00',  '12:30',  null,     null),      -- segunda
+  (2, true,  '08:00',  '12:30',  null,     null),      -- terca
+  (3, true,  '08:00',  '12:30',  null,     null),      -- quarta
+  (4, true,  '08:00',  '12:30',  null,     null),      -- quinta
+  (5, true,  '08:00',  '12:30',  null,     null),      -- sexta
+  (6, true,  '09:00',  '23:00',  null,     null)       -- sabado
 on conflict (dia_semana) do nothing;
 
 -- ---------------------------------------------------------------------

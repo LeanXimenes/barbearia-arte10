@@ -24,18 +24,9 @@ const FUNCOES_PERMITIDAS = new Set(['horarios_disponiveis', 'dias_disponiveis', 
 
 const IDENTIFICADOR = /^[a-z_][a-z0-9_]*$/
 
-const db = await criarBanco()
+// Os dados e horários REAIS do seed: a demonstração mostra o site como ele vai ficar.
+const db = await criarBanco({ agendaDeTeste: false })
 console.log('Banco carregado (migrações + seed).')
-
-// Dados de demonstração para a navegação ficar parecida com o uso real.
-await db.exec(`
-  update public.config_barbearia set
-    telefone_whatsapp = '17999999999',
-    instagram         = 'barbeariaarte10',
-    endereco          = 'Rua Exemplo, 123 - Centro',
-    cidade            = 'Sua Cidade',
-    uf                = 'SP';
-`)
 
 function cabecalhosCors() {
   return {

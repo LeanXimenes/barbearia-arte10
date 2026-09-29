@@ -1,21 +1,18 @@
 import type { ConfigBarbearia, HorarioFuncionamento } from '../lib/tipos'
-import { hora, linkInstagram, linkWhatsapp, nomeDoDiaDaSemana, telefoneBonito } from '../lib/formato'
+import { hora, linkInstagram, linkWhatsapp, telefoneBonito } from '../lib/formato'
+import { agruparFuncionamento } from '../lib/funcionamento'
 
 interface Props {
   config: ConfigBarbearia | null
   funcionamento: HorarioFuncionamento[]
 }
 
-const ORDEM = [1, 2, 3, 4, 5, 6, 0]
-
 export function Rodape({ config, funcionamento }: Props) {
   const whats = linkWhatsapp(config?.telefone_whatsapp ?? null)
   const insta = linkInstagram(config?.instagram ?? null)
   const ano = new Date().getFullYear()
 
-  const abertos = ORDEM.map((d) => funcionamento.find((f) => f.dia_semana === d)).filter(
-    (d): d is HorarioFuncionamento => Boolean(d?.aberto)
-  )
+  const abertos = agruparFuncionamento(funcionamento).filter((g) => g.aberto)
 
   return (
     <footer className="rodape">
@@ -38,9 +35,9 @@ export function Rodape({ config, funcionamento }: Props) {
           <div>
             <p className="rodape__titulo">Funcionamento</p>
             {abertos.length === 0 && <p className="rodape__texto">Consulte os horários.</p>}
-            {abertos.map((dia) => (
-              <p key={dia.dia_semana} className="rodape__texto">
-                {nomeDoDiaDaSemana(dia.dia_semana)} — {hora(dia.abre)} às {hora(dia.fecha)}
+            {abertos.map((grupo) => (
+              <p key={grupo.dias.join('-')} className="rodape__texto">
+                {grupo.rotulo} — {hora(grupo.abre)} às {hora(grupo.fecha)}
               </p>
             ))}
           </div>

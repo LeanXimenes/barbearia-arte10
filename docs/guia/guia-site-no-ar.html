@@ -46,7 +46,8 @@
   .resumo li { margin: 3px 0; }
   .tempo { color: var(--cinza); font-size: 9.5pt; }
 
-  .etapa { margin: 16px 0 6px; display: flex; align-items: center; gap: 10px; break-after: avoid; }
+  .etapa { margin: 16px 0 6px; display: flex; align-items: center; gap: 10px; break-after: avoid; break-inside: avoid; page-break-inside: avoid; }
+  .etapa + ol.passos { break-before: avoid; }
   .etapa .num {
     width: 30px; height: 30px; border-radius: 50%; background: var(--azul); color: #fadf68;
     display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13pt; flex-shrink: 0;
@@ -100,7 +101,7 @@
   <h2>Resumo — são 4 etapas</h2>
   <ol>
     <li><b>Criar o banco</b> — colar um arquivo no Supabase e clicar em Run. <span class="tempo">(5 min)</span></li>
-    <li><b>Colocar os dados da barbearia</b> — endereço, WhatsApp e Instagram. <span class="tempo">(3 min)</span></li>
+    <li><b>Conferir os dados da barbearia</b> — já vão prontos no instalador. <span class="tempo">(1 min)</span></li>
     <li><b>Publicar o site</b> — gerar o site e arrastar para o Netlify. <span class="tempo">(10 min)</span></li>
     <li><b>Testar</b> — fazer um agendamento de teste e limpar antes de divulgar. <span class="tempo">(5 min)</span></li>
   </ol>
@@ -142,33 +143,22 @@
 </ol>
 
 <!-- ============================================================ -->
-<div class="etapa"><div class="num">2</div><h2>Colocar os dados da barbearia</h2><span class="tempo">3 min</span></div>
+<div class="etapa"><div class="num">2</div><h2>Conferir os dados da barbearia</h2><span class="tempo">1 min</span></div>
 
-<p style="margin:4px 0">No mesmo editor de SQL, clique em <b>New query</b>, cole o texto abaixo, <b>troque o que está entre aspas
-pelos seus dados</b> e clique em <b>Run</b>:</p>
-
-<pre><span class="c">-- Dados que aparecem no site (dá para mudar depois pelo app)</span>
-update public.config_barbearia set
-  telefone_whatsapp = <span class="t">'17999999999'</span>,          <span class="c">-- só números, com DDD</span>
-  instagram         = <span class="t">'barbeariaarte10'</span>,      <span class="c">-- sem o @</span>
-  endereco          = <span class="t">'Rua Exemplo, 123 - Centro'</span>,
-  cidade            = <span class="t">'Sua Cidade'</span>,
-  uf                = <span class="t">'SP'</span>
-where id;</pre>
-
-<p style="margin:6px 0 4px">Horários que já vêm configurados (mude pelo app do barbeiro, em <b>Ajustes</b>):</p>
+<p style="margin:4px 0 6px">Não precisa digitar nada: estes dados já foram junto no instalador da etapa 1 e aparecem no site.</p>
 <table>
-  <tr><th>Dia</th><th>Horário</th><th>Intervalo</th></tr>
-  <tr><td>Segunda a quinta</td><td>09:00 às 19:00</td><td>12:00 às 13:30</td></tr>
-  <tr><td>Sexta</td><td>09:00 às 20:00</td><td>12:00 às 13:30</td></tr>
-  <tr><td>Sábado</td><td>08:00 às 18:00</td><td>—</td></tr>
-  <tr><td>Domingo</td><td colspan="2">Fechado</td></tr>
+  <tr><th style="width:32%">O quê</th><th>Como vai aparecer no site</th></tr>
+  <tr><td>Endereço</td><td>Rua Joaquim Iglesias, 889 — Santa Albertina/SP (botão <b>Como chegar</b> abre o Google Maps)</td></tr>
+  <tr><td>WhatsApp</td><td>(17) 99731-3480</td></tr>
+  <tr><td>Instagram</td><td>@aquiles.hiroshi</td></tr>
+  <tr><td>Segunda a sexta</td><td>08:00 às 12:30</td></tr>
+  <tr><td>Sábado e domingo</td><td>09:00 às 23:00</td></tr>
 </table>
+<p style="margin:6px 0 4px">Para mudar qualquer um deles depois, use o app do barbeiro (tela <b>Ajustes</b>).</p>
 <p class="tempo" style="margin:0">Serviços que já vêm cadastrados: Corte (35 min · R$ 35), Barba (30 min · R$ 30), Corte + Barba (60 min · R$ 60),
 Pezinho (20 min · R$ 15) e Sobrancelha (10 min · R$ 5). Preços e durações também se mudam pelo app.</p>
 
 <!-- ============================================================ -->
-<div class="quebra"></div>
 <div class="etapa"><div class="num">3</div><h2>Publicar o site no Netlify</h2><span class="tempo">10 min</span></div>
 
 <p style="margin:4px 0 6px"><b>Parte A — gerar o site</b> (cria a pasta com os arquivos prontos):</p>
@@ -235,10 +225,10 @@ Pezinho (20 min · R$ 15) e Sobrancelha (10 min · R$ 5). Preços e durações t
           <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. Gere o site de novo (<code>npm run build</code>).</td></tr>
   <tr><td><i>"Não conseguimos carregar os serviços agora"</i></td>
       <td>O banco ainda não foi instalado (etapa 1) ou deu erro no meio. Rode o <code>instalar_tudo.sql</code> de novo.</td></tr>
-  <tr><td>Endereço, WhatsApp ou Instagram não aparecem</td>
-      <td>Faça a etapa 2. Campos em branco ficam escondidos de propósito.</td></tr>
+  <tr><td>Endereço, WhatsApp ou Instagram errados ou faltando</td>
+      <td>Corrija pelo app do barbeiro (<b>Ajustes → Editar dados</b>). Campos em branco ficam escondidos de propósito.</td></tr>
   <tr><td>Nenhum dia disponível no calendário</td>
-      <td>Confira os horários de funcionamento e se há serviços ativos. Domingo é fechado.</td></tr>
+      <td>Confira os horários de funcionamento e se há serviços ativos (pelo app do barbeiro, em <b>Ajustes</b> e <b>Serviços</b>).</td></tr>
   <tr><td><i>"Muitos agendamentos em pouco tempo"</i></td>
       <td>É o freio contra robôs (20 agendamentos em 10 minutos). Em uso normal nunca aparece; nos testes, espere alguns minutos.</td></tr>
   <tr><td><code>npm</code> não é reconhecido no PowerShell</td>
