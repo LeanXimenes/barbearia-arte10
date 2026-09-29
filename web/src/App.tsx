@@ -108,6 +108,8 @@ export default function App() {
               funcionamento={funcionamento}
               aoAgendar={() => abrirAgendamento()}
               aoVerServicos={() => irPara(1)}
+              aoVerHorarios={() => irPara(2)}
+              aoVerContato={() => irPara(3)}
             />
           </section>
 

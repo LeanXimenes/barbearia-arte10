@@ -8,14 +8,21 @@ interface Props {
   funcionamento: HorarioFuncionamento[]
   aoAgendar: () => void
   aoVerServicos: () => void
+  aoVerHorarios: () => void
+  aoVerContato: () => void
 }
 
-export function Hero({ config, funcionamento, aoAgendar, aoVerServicos }: Props) {
+export function Hero({
+  config,
+  funcionamento,
+  aoAgendar,
+  aoVerServicos,
+  aoVerHorarios,
+  aoVerContato,
+}: Props) {
   const agora = agoraNaBarbearia(config?.fuso)
   const estado = estadoAgora(funcionamento, agora)
   const hoje = funcionamento.find((f) => f.dia_semana === agora.diaSemana)
-
-  const cidade = [config?.cidade, config?.uf].filter(Boolean).join(' — ')
 
   return (
     <div className="container aba__conteudo hero">
@@ -54,39 +61,36 @@ export function Hero({ config, funcionamento, aoAgendar, aoVerServicos }: Props)
       </div>
 
       <div className="destaques">
-        <div className="cartao destaque">
+        <button type="button" className="destaque" onClick={aoVerHorarios}>
           <span className="destaque__icone">
             <IconeRelogio tamanho={18} />
           </span>
-          <span>
-            <span className="destaque__titulo">Hoje</span>
-            <span className="destaque__valor">
-              {hoje?.aberto && hoje.abre && hoje.fecha
-                ? `${hora(hoje.abre)} — ${hora(hoje.fecha)}`
-                : 'Fechado'}
-            </span>
+          <span className="destaque__titulo">Hoje</span>
+          <span className="destaque__valor">
+            {hoje?.aberto && hoje.abre && hoje.fecha
+              ? `${hora(hoje.abre)}–${hora(hoje.fecha)}`
+              : 'Fechado'}
           </span>
-        </div>
+          <span className="destaque__sub">ver a semana</span>
+        </button>
 
-        <div className="cartao destaque">
+        <button type="button" className="destaque" onClick={aoAgendar}>
           <span className="destaque__icone">
             <IconeCalendario tamanho={18} />
           </span>
-          <span>
-            <span className="destaque__titulo">Agendamento</span>
-            <span className="destaque__valor">Online, sem fila</span>
-          </span>
-        </div>
+          <span className="destaque__titulo">Agenda</span>
+          <span className="destaque__valor">Online</span>
+          <span className="destaque__sub">sem fila</span>
+        </button>
 
-        <div className="cartao destaque">
+        <button type="button" className="destaque" onClick={aoVerContato}>
           <span className="destaque__icone">
             <IconeLocal tamanho={18} />
           </span>
-          <span>
-            <span className="destaque__titulo">Onde</span>
-            <span className="destaque__valor">{cidade || 'Com hora marcada'}</span>
-          </span>
-        </div>
+          <span className="destaque__titulo">Onde</span>
+          <span className="destaque__valor">{config?.cidade || 'Ver endereço'}</span>
+          <span className="destaque__sub">{config?.uf || 'como chegar'}</span>
+        </button>
       </div>
     </div>
   )
