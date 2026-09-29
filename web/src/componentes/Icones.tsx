@@ -27,6 +27,14 @@ export const IconeTesoura = ({ tamanho = 20, className }: Props) => (
   </svg>
 )
 
+export const IconeInicio = ({ tamanho = 20, className }: Props) => (
+  <svg {...base(tamanho)} className={className}>
+    <path d="M3 10.5 12 3l9 7.5" />
+    <path d="M5 9.5V21h14V9.5" />
+    <path d="M10 21v-6h4v6" />
+  </svg>
+)
+
 export const IconeRelogio = ({ tamanho = 20, className }: Props) => (
   <svg {...base(tamanho)} className={className}>
     <circle cx="12" cy="12" r="9" />

@@ -97,7 +97,7 @@ export function estadoAgora(
   const h = agora.hora
 
   if (h < abre) return { aberto: false, detalhe: `Abre às ${abre}` }
-  if (h >= fecha) return { aberto: false, detalhe: 'Fechado agora' }
+  if (h >= fecha) return { aberto: false, detalhe: 'Encerrado por hoje' }
 
   if (hoje.intervalo_inicio && hoje.intervalo_fim) {
     const ini = hoje.intervalo_inicio.slice(0, 5)

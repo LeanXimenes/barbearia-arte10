@@ -17,70 +17,61 @@ export function SecaoFuncionamento({ funcionamento, config, aoAgendar }: Props) 
   const grupos = agruparFuncionamento(funcionamento)
 
   return (
-    <section className="secao" id="funcionamento">
-      <div className="container">
-        <span className="etiqueta">Funcionamento</span>
-        <h2 className="titulo-secao">Quando estamos abertos</h2>
-        <p className="subtitulo-secao">
-          Os horários abaixo são os mesmos que alimentam a agenda: nada aparece para reserva fora
-          desta grade.
-        </p>
+    <div className="container aba__conteudo">
+      <span className="etiqueta">Horários</span>
+      <h2 className="titulo-secao">Quando estamos abertos</h2>
 
-        <div className="funcionamento">
-          <div className="cartao horarios-lista">
-            {grupos.length === 0 && (
-              <div className="horarios-lista__item">
-                <span className="horarios-lista__valor">Carregando horários…</span>
-              </div>
-            )}
+      <div className="funcionamento">
+        <div className="cartao horarios-lista">
+          {grupos.length === 0 && (
+            <div className="horarios-lista__item">
+              <span className="horarios-lista__valor">Carregando horários…</span>
+            </div>
+          )}
 
-            {grupos.map((grupo) => {
-              const ehHoje = grupo.dias.includes(agora.diaSemana)
-              return (
-                <div
-                  key={grupo.dias.join('-')}
-                  className={`horarios-lista__item ${ehHoje ? 'horarios-lista__item--hoje' : ''}`}
-                >
-                  <span className="horarios-lista__dia">
-                    {grupo.rotulo}
-                    {ehHoje && <span className="marcador-hoje">Hoje</span>}
+          {grupos.map((grupo) => {
+            const ehHoje = grupo.dias.includes(agora.diaSemana)
+            return (
+              <div
+                key={grupo.dias.join('-')}
+                className={`horarios-lista__item ${ehHoje ? 'horarios-lista__item--hoje' : ''}`}
+              >
+                <span className="horarios-lista__dia">
+                  {grupo.rotulo}
+                  {ehHoje && <span className="marcador-hoje">Hoje</span>}
+                </span>
+
+                {grupo.aberto && grupo.abre && grupo.fecha ? (
+                  <span className="horarios-lista__valor">
+                    {hora(grupo.abre)} — {hora(grupo.fecha)}
+                    {grupo.intervaloInicio && grupo.intervaloFim && (
+                      <>
+                        <br />
+                        <small style={{ opacity: 0.7 }}>
+                          intervalo {hora(grupo.intervaloInicio)} — {hora(grupo.intervaloFim)}
+                        </small>
+                      </>
+                    )}
                   </span>
+                ) : (
+                  <span className="horarios-lista__valor horarios-lista__valor--fechado">
+                    Fechado
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
 
-                  {grupo.aberto && grupo.abre && grupo.fecha ? (
-                    <span className="horarios-lista__valor">
-                      {hora(grupo.abre)} — {hora(grupo.fecha)}
-                      {grupo.intervaloInicio && grupo.intervaloFim && (
-                        <>
-                          <br />
-                          <small style={{ opacity: 0.7 }}>
-                            intervalo {hora(grupo.intervaloInicio)} — {hora(grupo.intervaloFim)}
-                          </small>
-                        </>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="horarios-lista__valor horarios-lista__valor--fechado">
-                      Fechado
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="cartao painel-agendar">
-            <IconeCalendario tamanho={30} className="destaque__icone" />
-            <h3 className="painel-agendar__titulo">Veja os horários livres</h3>
-            <p style={{ color: 'var(--texto-suave)', fontSize: '0.94rem' }}>
-              A disponibilidade é conferida no servidor na hora de confirmar. Se alguém marcar
-              antes de você, o site avisa e mostra as opções que sobraram.
-            </p>
-            <button type="button" className="botao botao--ouro botao--bloco" onClick={aoAgendar}>
-              Ver horários disponíveis
-            </button>
-          </div>
+        <div className="cartao painel-agendar">
+          <IconeCalendario tamanho={26} className="destaque__icone so-desktop" />
+          <p className="painel-agendar__titulo">Veja os horários livres</p>
+          <p className="painel-agendar__texto">A agenda mostra na hora só o que ainda está vago.</p>
+          <button type="button" className="botao botao--ouro botao--bloco" onClick={aoAgendar}>
+            Ver horários disponíveis
+          </button>
         </div>
       </div>
-    </section>
+    </div>
   )
 }

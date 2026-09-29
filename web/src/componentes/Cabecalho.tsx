@@ -1,50 +1,62 @@
-import { useEffect, useState } from 'react'
+import type { KeyboardEvent } from 'react'
+import { ABAS } from '../lib/abas'
 import { IconeTesoura } from './Icones'
 
-const LINKS = [
-  { href: '#servicos', texto: 'Serviços' },
-  { href: '#funcionamento', texto: 'Horários' },
-  { href: '#localizacao', texto: 'Localização' },
-  { href: '#contato', texto: 'Contato' },
-]
-
 interface Props {
+  aba: number
+  aoTrocarAba: (indice: number) => void
   aoAgendar: () => void
 }
 
-export function Cabecalho({ aoAgendar }: Props) {
-  const [rolado, setRolado] = useState(false)
-
-  useEffect(() => {
-    const aoRolar = () => setRolado(window.scrollY > 12)
-    aoRolar()
-    window.addEventListener('scroll', aoRolar, { passive: true })
-    return () => window.removeEventListener('scroll', aoRolar)
-  }, [])
+export function Cabecalho({ aba, aoTrocarAba, aoAgendar }: Props) {
+  // Setas do teclado andam entre as abas, como pede o padrão de acessibilidade.
+  const aoTeclar = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowRight') aoTrocarAba((aba + 1) % ABAS.length)
+    else if (e.key === 'ArrowLeft') aoTrocarAba((aba - 1 + ABAS.length) % ABAS.length)
+    else return
+    e.preventDefault()
+  }
 
   return (
-    <header className={`cabecalho ${rolado ? 'cabecalho--rolado' : ''}`}>
+    <header className="cabecalho">
       <div className="container cabecalho__linha">
-        <a href="#inicio" className="marca" aria-label="Barbearia Arte 10 — início">
+        <button
+          type="button"
+          className="marca"
+          aria-label="Barbearia Arte 10 — início"
+          onClick={() => aoTrocarAba(0)}
+        >
           <img src="/logo-arte10-mini.jpg" alt="" className="marca__logo" width={40} height={40} />
           <span className="marca__texto">
             <span className="marca__nome">Arte 10</span>
             <span className="marca__sub">Barbearia</span>
           </span>
-        </a>
+        </button>
 
-        <nav className="navegacao" aria-label="Navegação principal">
-          {LINKS.map((link) => (
-            <a key={link.href} href={link.href} className="navegacao__item">
-              {link.texto}
-            </a>
+        <nav className="navegacao" role="tablist" aria-label="Seções do site" onKeyDown={aoTeclar}>
+          {ABAS.map((item, i) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              id={`aba-${item.id}`}
+              aria-controls={`painel-${item.id}`}
+              aria-selected={i === aba}
+              tabIndex={i === aba ? 0 : -1}
+              className={`navegacao__item ${i === aba ? 'navegacao__item--ativo' : ''}`}
+              onClick={() => aoTrocarAba(i)}
+            >
+              {item.texto}
+            </button>
           ))}
         </nav>
 
         <div className="cabecalho__acao">
           <button type="button" className="botao botao--ouro" onClick={aoAgendar}>
             <IconeTesoura tamanho={17} />
-            Agendar horário
+            <span>
+              Agendar<span className="so-desktop"> horário</span>
+            </span>
           </button>
         </div>
       </div>

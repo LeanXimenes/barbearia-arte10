@@ -125,7 +125,7 @@ describe('estado da barbearia agora', () => {
       'Abre às 09:00'
     )
     expect(estadoAgora(semana, { data: '2026-09-21', hora: '20:00', diaSemana: 1 }).detalhe).toBe(
-      'Fechado agora'
+      'Encerrado por hoje'
     )
   })
 })
