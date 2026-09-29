@@ -174,7 +174,8 @@ body {
 .barra-abas {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   background: rgba(4, 10, 24, 0.97);
   border-top: 1px solid var(--borda-suave);
@@ -671,6 +672,136 @@ body {
   font-size: 0.76rem;
 }
 
+/* App ------------------------------------------------------------ */
+
+.app-aba {
+  max-width: 560px;
+}
+
+.app-aba__texto {
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.app-vantagens {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.app-vantagens li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: var(--texto);
+}
+
+.app-vantagens__check {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(233, 200, 79, 0.14);
+  color: var(--ouro-400);
+}
+
+.app-instalar {
+  position: relative;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-color: var(--borda);
+  background: linear-gradient(180deg, rgba(14, 32, 71, 0.72), rgba(7, 15, 34, 0.72));
+  box-shadow: var(--sombra-suave);
+  overflow: hidden;
+}
+
+.app-instalar::before {
+  content: '';
+  position: absolute;
+  inset: 0 18% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ouro-400), transparent);
+}
+
+.app-instalar__topo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-instalar__icone {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--borda);
+}
+
+.app-instalar__nome {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.app-instalar__sub {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--texto-fraco);
+}
+
+.app-instalar__pronto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--sucesso);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.app-passos {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.app-passos li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+.app-passos strong {
+  color: var(--texto);
+}
+
+.app-passos__numero {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.app-passos__icone {
+  display: inline-block;
+  vertical-align: -2px;
+  color: var(--ouro-400);
+}
+
 /* Telas baixas (celular pequeno ou deitado) ----------------------- */
 
 @media (max-height: 640px) {
@@ -679,6 +810,12 @@ body {
     gap: 10px;
   }
   .hero__texto {
+    display: none;
+  }
+}
+
+@media (max-height: 700px) {
+  .app-aba__texto {
     display: none;
   }
 }

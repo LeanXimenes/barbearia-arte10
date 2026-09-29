@@ -4,15 +4,16 @@ import { IconeTesoura } from './Icones'
 
 interface Props {
   aba: number
+  total: number
   aoTrocarAba: (indice: number) => void
   aoAgendar: () => void
 }
 
-export function Cabecalho({ aba, aoTrocarAba, aoAgendar }: Props) {
+export function Cabecalho({ aba, total, aoTrocarAba, aoAgendar }: Props) {
   // Setas do teclado andam entre as abas, como pede o padrão de acessibilidade.
   const aoTeclar = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowRight') aoTrocarAba((aba + 1) % ABAS.length)
-    else if (e.key === 'ArrowLeft') aoTrocarAba((aba - 1 + ABAS.length) % ABAS.length)
+    if (e.key === 'ArrowRight') aoTrocarAba((aba + 1) % total)
+    else if (e.key === 'ArrowLeft') aoTrocarAba((aba - 1 + total) % total)
     else return
     e.preventDefault()
   }
@@ -34,7 +35,7 @@ export function Cabecalho({ aba, aoTrocarAba, aoAgendar }: Props) {
         </button>
 
         <nav className="navegacao" role="tablist" aria-label="Seções do site" onKeyDown={aoTeclar}>
-          {ABAS.map((item, i) => (
+          {ABAS.slice(0, total).map((item, i) => (
             <button
               key={item.id}
               type="button"

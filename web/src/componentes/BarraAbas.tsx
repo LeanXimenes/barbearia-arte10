@@ -1,23 +1,25 @@
 import { ABAS, type IdAba } from '../lib/abas'
-import { IconeInicio, IconeLocal, IconeRelogio, IconeTesoura } from './Icones'
+import { IconeCelular, IconeInicio, IconeLocal, IconeRelogio, IconeTesoura } from './Icones'
 
 const ICONES: Record<IdAba, typeof IconeInicio> = {
   inicio: IconeInicio,
   servicos: IconeTesoura,
   horarios: IconeRelogio,
   contato: IconeLocal,
+  app: IconeCelular,
 }
 
 interface Props {
   aba: number
+  total: number
   aoTrocarAba: (indice: number) => void
 }
 
 /** Abas no rodapé, só no celular (no computador elas ficam no cabeçalho). */
-export function BarraAbas({ aba, aoTrocarAba }: Props) {
+export function BarraAbas({ aba, total, aoTrocarAba }: Props) {
   return (
     <nav className="barra-abas" aria-label="Seções do site">
-      {ABAS.map((item, i) => {
+      {ABAS.slice(0, total).map((item, i) => {
         const Icone = ICONES[item.id]
         return (
           <button

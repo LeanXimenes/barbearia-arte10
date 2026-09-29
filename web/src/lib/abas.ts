@@ -4,6 +4,8 @@ export const ABAS = [
   { id: 'servicos', texto: 'Serviços' },
   { id: 'horarios', texto: 'Horários' },
   { id: 'contato', texto: 'Contato' },
+  // Some quando o site já está aberto como app instalado.
+  { id: 'app', texto: 'App' },
 ] as const
 
 export type IdAba = (typeof ABAS)[number]['id']
@@ -14,11 +16,11 @@ const APELIDOS: Record<string, IdAba> = {
   localizacao: 'contato',
 }
 
-export function abaDoEndereco(hash: string): number {
+export function abaDoEndereco(hash: string, total: number = ABAS.length): number {
   const id = hash.replace(/^#/, '').toLowerCase()
   const alvo = APELIDOS[id] ?? id
   const indice = ABAS.findIndex((a) => a.id === alvo)
-  return indice < 0 ? 0 : indice
+  return indice < 0 || indice >= total ? 0 : indice
 }
 
 /** Deslize mínimo (px) para trocar de aba, e só se o gesto for mais lateral que vertical. */

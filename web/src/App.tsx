@@ -9,6 +9,8 @@ import { Hero } from './componentes/Hero'
 import { SecaoServicos } from './componentes/SecaoServicos'
 import { SecaoFuncionamento } from './componentes/SecaoFuncionamento'
 import { SecaoLocalizacao } from './componentes/SecaoLocalizacao'
+import { SecaoApp } from './componentes/SecaoApp'
+import { abertoComoApp } from './hooks/useInstalarApp'
 import { ModalAgendamento } from './componentes/agendamento/ModalAgendamento'
 import { IconeAlerta } from './componentes/Icones'
 
@@ -16,7 +18,9 @@ export default function App() {
   const { config, servicos, funcionamento, carregando, erro, recarregar } = useDadosDaBarbearia()
   const online = useOnline()
 
-  const [aba, setAba] = useState(() => abaDoEndereco(window.location.hash))
+  // Quem já abriu pelo app instalado não precisa da aba que ensina a instalar.
+  const [total] = useState(() => (abertoComoApp() ? ABAS.length - 1 : ABAS.length))
+  const [aba, setAba] = useState(() => abaDoEndereco(window.location.hash, total))
   const paineis = useRef<(HTMLElement | null)[]>([])
   const toque = useRef<{ x: number; y: number } | null>(null)
 
@@ -33,7 +37,7 @@ export default function App() {
 
   const fecharAgendamento = () => setModal({ aberto: false, servicoId: null })
 
-  const irPara = (indice: number) => setAba(Math.max(0, Math.min(ABAS.length - 1, indice)))
+  const irPara = (indice: number) => setAba(Math.max(0, Math.min(total - 1, indice)))
 
   // A aba vai para o endereço (#servicos): o link compartilhado abre na aba certa.
   useEffect(() => {
@@ -46,10 +50,10 @@ export default function App() {
   }, [aba])
 
   useEffect(() => {
-    const aoMudar = () => setAba(abaDoEndereco(window.location.hash))
+    const aoMudar = () => setAba(abaDoEndereco(window.location.hash, total))
     window.addEventListener('hashchange', aoMudar)
     return () => window.removeEventListener('hashchange', aoMudar)
-  }, [])
+  }, [total])
 
   const aoTocar = (e: React.TouchEvent) => {
     const t = e.touches[0]
@@ -98,7 +102,12 @@ export default function App() {
         </div>
       )}
 
-      <Cabecalho aba={aba} aoTrocarAba={irPara} aoAgendar={() => abrirAgendamento()} />
+      <Cabecalho
+        aba={aba}
+        total={total}
+        aoTrocarAba={irPara}
+        aoAgendar={() => abrirAgendamento()}
+      />
 
       <main className="palco" onTouchStart={aoTocar} onTouchEnd={aoSoltar}>
         <div className="trilho" style={{ transform: `translateX(-${aba * 100}%)` }}>
@@ -134,10 +143,16 @@ export default function App() {
           <section {...painel(3)}>
             <SecaoLocalizacao config={config} />
           </section>
+
+          {total === ABAS.length && (
+            <section {...painel(4)}>
+              <SecaoApp />
+            </section>
+          )}
         </div>
       </main>
 
-      <BarraAbas aba={aba} aoTrocarAba={irPara} />
+      <BarraAbas aba={aba} total={total} aoTrocarAba={irPara} />
 
       {modal.aberto && (
         <ModalAgendamento

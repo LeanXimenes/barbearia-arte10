@@ -35,6 +35,21 @@ export const IconeInicio = ({ tamanho = 20, className }: Props) => (
   </svg>
 )
 
+export const IconeCelular = ({ tamanho = 20, className }: Props) => (
+  <svg {...base(tamanho)} className={className}>
+    <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+    <line x1="10.5" y1="18.5" x2="13.5" y2="18.5" />
+  </svg>
+)
+
+export const IconeCompartilhar = ({ tamanho = 20, className }: Props) => (
+  <svg {...base(tamanho)} className={className}>
+    <path d="M12 3v12" />
+    <polyline points="8 7 12 3 16 7" />
+    <path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" />
+  </svg>
+)
+
 export const IconeRelogio = ({ tamanho = 20, className }: Props) => (
   <svg {...base(tamanho)} className={className}>
     <circle cx="12" cy="12" r="9" />

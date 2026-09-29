@@ -32,3 +32,13 @@ describe('direcaoDoDeslize', () => {
     expect(direcaoDoDeslize(-70, 90)).toBe(0)
   })
 })
+
+describe('aba App', () => {
+  it('abre pelo endereço #app', () => {
+    expect(abaDoEndereco('#app')).toBe(4)
+  })
+
+  it('no app instalado (sem a aba App) o endereço #app cai no início', () => {
+    expect(abaDoEndereco('#app', 4)).toBe(0)
+  })
+})
