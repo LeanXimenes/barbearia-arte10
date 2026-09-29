@@ -21,7 +21,7 @@ as $$
   select jsonb_build_object(
     'id',              a.id,
     'codigo',          upper(substring(replace(a.id::text, '-', '') from 1 for 6)),
-    'cliente',         c.nome,
+    'cliente',         a.cliente_nome,
     'telefone',        c.telefone,
     'servico',         a.servico_nome,
     'preco',           a.servico_preco,
@@ -95,6 +95,11 @@ declare
   v_passo_seg bigint;
 begin
   v_chave := nullif(btrim(coalesce(p_idempotency_key, '')), '');
+
+  -- A chave vem do navegador: limita o tamanho (evita erro de índice e abuso).
+  if v_chave is not null and char_length(v_chave) > 100 then
+    return public.resposta_erro('DADOS_INVALIDOS');
+  end if;
 
   -- 0) IDEMPOTENCIA (item 21): a mesma chave sempre devolve a mesma reserva.
   if v_chave is not null then
@@ -190,6 +195,15 @@ begin
   --     proprietario. Duas reservas concorrentes entram uma de cada vez.
   perform pg_advisory_xact_lock(hashtext('barbearia_arte10:agenda'));
 
+  -- 10b) Freio contra robôs. A chave anon é pública e, pela regra do item 14,
+  --      o dono não pode apagar reservas: sem este limite, um script poderia
+  --      lotar a agenda com telefones inventados.
+  if (select count(*) from public.agendamentos a
+       where a.origem = 'site'
+         and a.created_at > now() - interval '10 minutes') >= v_cfg.limite_agendamentos_10min then
+    return public.resposta_erro('MUITAS_TENTATIVAS');
+  end if;
+
   -- 11) Bloqueio administrativo (itens 15 e 23).
   if exists (select 1 from public.bloqueios b where b.periodo && v_range) then
     return public.resposta_erro('HORARIO_BLOQUEADO');
@@ -223,12 +237,12 @@ begin
     returning id into v_cliente_id;
 
     insert into public.agendamentos (
-      cliente_id, servico_id, data, horario_inicio, horario_fim,
+      cliente_id, cliente_nome, servico_id, data, horario_inicio, horario_fim,
       inicio_em, fim_em, origem, idempotency_key,
       servico_nome, servico_preco, servico_duracao
     )
     values (
-      v_cliente_id, v_srv.id, p_data, v_ini_ts::time, v_fim_ts::time,
+      v_cliente_id, v_nome, v_srv.id, p_data, v_ini_ts::time, v_fim_ts::time,
       v_ini, v_fim, 'site', v_chave,
       v_srv.nome, v_srv.preco, v_srv.duracao_minutos
     )
@@ -267,21 +281,20 @@ begin
 
   -- 15) Enfileira a notificacao push do proprietario (item 19).
   insert into public.notificacoes (agendamento_id, tipo, titulo, corpo, dados)
-  select
+  values (
     v_agendamento_id,
     'novo_agendamento',
     'Novo agendamento',
-    c.nome || ' marcou ' || v_srv.nome || ' — ' ||
+    v_nome || ' marcou ' || v_srv.nome || ' — ' ||
       to_char(p_data, 'DD/MM') || ' às ' || to_char(v_ini_ts::time, 'HH24:MI'),
     jsonb_build_object(
       'agendamento_id', v_agendamento_id,
       'data',           p_data,
       'horario',        to_char(v_ini_ts::time, 'HH24:MI'),
       'servico',        v_srv.nome,
-      'cliente',        c.nome
+      'cliente',        v_nome
     )
-  from public.clientes c
-  where c.id = v_cliente_id;
+  );
 
   return jsonb_build_object(
     'ok',          true,

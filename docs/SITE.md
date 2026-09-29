@@ -1,122 +1,110 @@
 # Site público
 
-React 18 + TypeScript + Vite, sem framework de CSS: a identidade visual é
-escrita à mão sobre variáveis de tema, para bater exatamente com a logo.
+React 18 + TypeScript + Vite. A identidade visual (azul `#013681` e dourado
+`#FADF68`) é tirada da logo em `logo/logoart10.jpeg`.
+
+> Guia rápido para publicar: **`docs/Guia-colocar-o-site-no-ar.pdf`**.
 
 ---
 
-## Rodar localmente
+## Configuração
 
-```bash
-cd web
-cp .env.example .env
+O site precisa de duas variáveis, ambas **públicas**:
+
+```
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+- Em desenvolvimento ficam em `web/.env` (fora do git; modelo em
+  `web/.env.example`). A variável antiga `VITE_SUPABASE_ANON_KEY` também é
+  aceita.
+- No Netlify ficam em **Site configuration → Environment variables**.
+- Nunca coloque a chave **secret** / **service_role** aqui.
+
+Sem as variáveis, o site abre mas mostra um aviso no topo e o agendamento
+fica desligado.
+
+---
+
+## Rodar no computador (PowerShell)
+
+```powershell
+cd C:\arte10\web
 npm install
-npm run dev
+npm run dev          # usa o Supabase do web\.env
 ```
 
-O `.env` precisa de:
+### Modo demonstração (sem Supabase)
 
+Sobe o banco real em memória, com as mesmas migrações de produção:
+
+```powershell
+# janela 1
+cd C:\arte10\web
+npm run api:demo
+
+# janela 2
+cd C:\arte10\web
+npm run dev:demo
 ```
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua-anon-key-publica
-```
 
-Se faltar alguma das duas, o site abre normalmente mas mostra um aviso no topo
-e o agendamento fica desligado — em vez de quebrar em branco.
-
-### Sem projeto Supabase
-
-```bash
-# terminal 1 — sobe o banco real em memória e expõe a API
-node supabase/tests/servidor-local.mjs
-
-# terminal 2
-cd web
-VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=local npm run dev
-```
+(O tempo real não funciona nesse modo; o resto funciona.)
 
 ---
 
 ## Publicar no Netlify
 
-O `netlify.toml` na raiz já traz tudo configurado (`base = "web"`,
-`publish = "dist"`, redirect de SPA e cabeçalhos de segurança).
+### Opção A — arrastar e soltar (mais simples)
 
-1. **Add new site → Import an existing project** e escolha o repositório.
-2. O Netlify lê o `netlify.toml`; não é preciso mexer em build command.
-3. Em **Site configuration → Environment variables**, cadastre:
+```powershell
+cd C:\arte10\web
+npm install
+npm run build        # gera a pasta web\dist usando o web\.env
+```
 
-   | Chave | Valor |
-   |---|---|
-   | `VITE_SUPABASE_URL` | a URL do projeto |
-   | `VITE_SUPABASE_ANON_KEY` | a chave `anon` |
+Abra <https://app.netlify.com/drop> e arraste a pasta `web\dist`. Para
+atualizar depois: `npm run build` e arraste de novo em **Deploys**.
 
+Os cabeçalhos de segurança vão junto (`web/public/_headers`).
+
+### Opção B — pelo GitHub (atualiza sozinho)
+
+1. Suba o projeto para um repositório no GitHub.
+2. Netlify → **Add new project → Import an existing project** → escolha o
+   repositório. O `netlify.toml` já diz tudo (`base = "web"`, `publish = "dist"`).
+3. **Environment variables**: `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_PUBLISHABLE_KEY`.
 4. **Deploy**.
 
-> As variáveis `VITE_*` entram no bundle do navegador — isso é esperado e
-> seguro **somente** para a chave `anon`. Nunca cadastre a `service_role` aqui.
+### Imagem ao compartilhar no WhatsApp
 
-Depois de publicar, adicione o domínio do Netlify em
-**Supabase → Authentication → URL Configuration → Redirect URLs** (mesmo o
-site não fazendo login, isso mantém a configuração coerente).
+A imagem de compartilhamento (`og-image.jpg`) precisa de endereço completo.
+Na opção B o Netlify preenche sozinho. Na opção A, acrescente ao `web\.env`
+`VITE_SITE_URL=https://seu-site.netlify.app`, gere de novo e publique.
 
 ---
 
 ## Como o agendamento funciona
 
 ```
-AGENDAR → SERVIÇO → DATA → HORÁRIO → NOME E TELEFONE → CONFIRMAR
+AGENDAR → SERVIÇO → DIA → HORÁRIO → NOME E TELEFONE → CONFIRMAR
 ```
 
-O que acontece por baixo:
-
-1. **Serviço** — `servicos` filtrado por `ativo = true` via RLS.
-2. **Data** — `dias_disponiveis()` devolve, para cada dia do mês visível, se a
-   barbearia abre, se está dentro da janela de agendamento e quantos horários
-   sobraram. Dias fechados e lotados aparecem riscados.
-3. **Horário** — `horarios_disponiveis()` devolve a grade já considerando a
-   **duração do serviço**. Horários ocupados aparecem marcados
-   **"JÁ AGENDADO"** e desabilitados; horários passados e fora do expediente
-   simplesmente não são oferecidos.
+1. **Serviço** — só os ativos (RLS).
+2. **Dia** — `dias_disponiveis()`: dias fechados e lotados aparecem riscados.
+3. **Horário** — `horarios_disponiveis()` já considera a duração do serviço.
+   Ocupados aparecem **"JÁ AGENDADO"**; passados e fora do expediente nem
+   aparecem.
 4. **Confirmar** — `criar_agendamento()` revalida tudo no servidor e grava.
-
-### Proteções da tela
 
 | Situação | O que o site faz |
 |---|---|
-| Vários cliques em *Confirmar* | Botão desabilita enquanto envia **e** manda sempre a mesma chave de idempotência — o banco devolve a mesma reserva em vez de criar outra. |
-| Alguém marcou o horário antes | Mostra *"Esse horário acabou de ser reservado…"*, recarrega a grade e volta para a escolha de horário. |
-| Internet cai no meio | Mostra *"Não foi possível concluir o agendamento…"*. **Nunca** mostra sucesso sem resposta do servidor. Tentar de novo reaproveita a mesma chave. |
-| Aparelho offline | Faixa no topo e botão de confirmar bloqueado. |
-| Agenda muda com a página aberta | Realtime em `agenda_publica` recarrega a grade e avisa discretamente. |
-
-### Idempotência
-
-Uma chave (UUID) é gerada para cada combinação de *serviço + data + horário*.
-Mudou a escolha, nasce uma chave nova; repetiu o mesmo pedido, o banco devolve
-a reserva original com `duplicado: true`.
-
----
-
-## Estrutura
-
-```
-web/src/
-├── lib/            supabase, tipos, formatação, relógio, erros
-├── servicos/api.ts toda a conversa com o Supabase mora aqui
-├── hooks/          dados da barbearia (com Realtime), estado da conexão
-├── estilos/        base (tokens), site (seções), agendamento (fluxo)
-└── componentes/
-    ├── Cabecalho, Hero, SecaoServicos, SecaoFuncionamento,
-    │   SecaoLocalizacao, Rodape, Icones
-    └── agendamento/
-        ├── ModalAgendamento   máquina de estados do fluxo
-        ├── EscolhaServico · EscolhaData · EscolhaHorario
-        ├── FormularioDados
-        └── Confirmacao
-```
-
-Nenhum componente calcula disponibilidade. Quem decide é o banco.
+| Vários cliques em Confirmar | Botão trava durante o envio e a mesma chave de idempotência vai em todas as tentativas: o banco devolve a mesma reserva. |
+| Alguém marcou antes | *"Esse horário acabou de ser reservado…"*, recarrega e volta para a escolha. |
+| Internet cai | *"Não foi possível concluir o agendamento…"* — nunca um falso sucesso. |
+| Agenda muda com a página aberta | Tempo real em `agenda_publica` recarrega a grade. |
+| Robô tentando lotar a agenda | Limite de reservas por 10 minutos (configurável) e por telefone. |
 
 ---
 
@@ -124,8 +112,7 @@ Nenhum componente calcula disponibilidade. Quem decide é o banco.
 
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | Servidor de desenvolvimento |
-| `npm run build` | Checagem de tipos + build de produção |
-| `npm run preview` | Serve o `dist/` local |
-| `npm run typecheck` | Só o TypeScript |
-| `npm test` | Testes unitários (Vitest) |
+| `npm run dev` | Desenvolvimento com o Supabase do `.env` |
+| `npm run api:demo` + `npm run dev:demo` | Demonstração com banco local |
+| `npm run build` | Checagem de tipos + versão de produção em `dist/` |
+| `npm test` | Testes (Vitest) |

@@ -99,7 +99,9 @@ class HistoricoViewModel : ViewModel() {
                 is Resultado.Sucesso -> _estado.update {
                     it.copy(
                         carregandoMais = false,
-                        itens = it.itens + r.dado,
+                        // Se chegou reserva nova durante a paginação, a mesma linha
+                        // pode vir em duas páginas: chave repetida derruba a LazyColumn.
+                        itens = (it.itens + r.dado).distinctBy { item -> item.id },
                         acabou = r.dado.size < PAGINA,
                     )
                 }

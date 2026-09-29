@@ -14,6 +14,21 @@ if (temFirebase) {
     apply(plugin = "com.google.gms.google-services")
 }
 
+// A versão que vai para o celular do barbeiro PRECISA avisar de novos
+// agendamentos: gerar o APK de release sem o Firebase é quase sempre engano.
+gradle.taskGraph.whenReady {
+    val geraRelease = allTasks.any { tarefa ->
+        tarefa.project == project &&
+            (tarefa.name == "assembleRelease" || tarefa.name == "bundleRelease")
+    }
+    if (geraRelease && !temFirebase) {
+        throw GradleException(
+            "Falta android/app/google-services.json: sem ele o app não recebe push " +
+                "de novos agendamentos. Veja docs/APLICATIVO.md (Notificações push)."
+        )
+    }
+}
+
 // Credenciais vêm de local.properties (fora do git) ou de variáveis de
 // ambiente — nunca escritas no código-fonte.
 val propriedadesLocais = Properties().apply {

@@ -46,6 +46,7 @@ import br.com.barbeariaarte10.admin.core.Formato
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.dados.modelo.AgendaDoDia
 import br.com.barbeariaarte10.admin.dados.modelo.ItemAgenda
+import br.com.barbeariaarte10.admin.ui.componentes.AvisoNotificacoes
 import br.com.barbeariaarte10.admin.ui.componentes.CartaoArte10
 import br.com.barbeariaarte10.admin.ui.componentes.Etiqueta
 import br.com.barbeariaarte10.admin.ui.componentes.EstadoVazio
@@ -123,6 +124,8 @@ fun InicioTela(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { Cabecalho(hoje = Formato.dataPorExtenso(hoje)) }
+
+        item { AvisoNotificacoes() }
 
         if (estado.erro != null) {
             item {

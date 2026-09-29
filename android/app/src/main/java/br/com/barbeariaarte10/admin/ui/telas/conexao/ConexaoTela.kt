@@ -36,6 +36,8 @@ import br.com.barbeariaarte10.admin.ui.tema.Ouro
 import br.com.barbeariaarte10.admin.ui.tema.TextoFraco
 import br.com.barbeariaarte10.admin.ui.tema.TextoSuave
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +66,16 @@ class SessaoViewModel : ViewModel() {
 
     private val trava = Mutex()
 
+    /** Nova tentativa automática enquanto estiver sem conexão (espera dobra até 1 min). */
+    private var tentativaAutomatica: Job? = null
+    private var espera = ESPERA_INICIAL
+
+    /** O servidor já confirmou (nesta abertura do app) que a conta tem acesso. */
+    private var acessoConferido = false
+
+    /** O servidor disse que a conta NÃO tem mais acesso. */
+    private var acessoNegado = false
+
     init {
         viewModelScope.launch {
             Grafo.autenticacao.status.collect { status ->
@@ -73,7 +85,10 @@ class SessaoViewModel : ViewModel() {
                     // agora (normalmente falta de internet). O app segue aberto e a
                     // faixa de "sem conexão" avisa; o Supabase tenta renovar sozinho.
                     is SessionStatus.Authenticated,
-                    is SessionStatus.RefreshFailure -> _estado.value = EstadoSessao.Conectado
+                    is SessionStatus.RefreshFailure -> {
+                        if (!acessoNegado) _estado.value = EstadoSessao.Conectado
+                        if (!acessoConferido) conferirAcesso()
+                    }
                     is SessionStatus.NotAuthenticated ->
                         if (_estado.value !is EstadoSessao.Falhou) conectar()
                 }
@@ -88,16 +103,57 @@ class SessaoViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Sessão restaurada do aparelho: confere uma vez se a conta continua
+     * liberada. Sem isso, uma conta desativada veria uma agenda vazia e
+     * acharia que não há clientes marcados.
+     */
+    private fun conferirAcesso() {
+        viewModelScope.launch {
+            val resultado = Grafo.autenticacao.verificarAcesso()
+            if (resultado !is Resultado.Sucesso) return@launch // offline: confere depois
+            acessoConferido = true
+            if (!resultado.dado) {
+                acessoNegado = true
+                _estado.value = EstadoSessao.Falhou(
+                    "Este aparelho não tem mais acesso à agenda da barbearia. " +
+                        "Libere a conta do app na tabela administradores do Supabase.",
+                    semConexao = false,
+                )
+            }
+        }
+    }
+
+    private fun agendarNovaTentativa() {
+        tentativaAutomatica?.cancel()
+        tentativaAutomatica = viewModelScope.launch {
+            delay(espera)
+            espera = (espera * 2).coerceAtMost(ESPERA_MAXIMA)
+            val atual = _estado.value
+            if (atual is EstadoSessao.Falhou && atual.semConexao) conectar()
+        }
+    }
+
     fun conectar() {
+        tentativaAutomatica?.cancel()
         viewModelScope.launch {
             if (!trava.tryLock()) return@launch
             try {
                 _estado.value = EstadoSessao.Conectando
+                acessoNegado = false
                 when (val resultado = Grafo.autenticacao.conectar()) {
-                    // O fluxo de status emite Authenticated e leva para Conectado.
-                    is Resultado.Sucesso -> _estado.value = EstadoSessao.Conectado
-                    is Resultado.Falha -> _estado.value =
-                        EstadoSessao.Falhou(resultado.mensagem, resultado.semConexao)
+                    // conectar() já confere a tabela administradores.
+                    is Resultado.Sucesso -> {
+                        acessoConferido = true
+                        espera = ESPERA_INICIAL
+                        _estado.value = EstadoSessao.Conectado
+                    }
+                    is Resultado.Falha -> {
+                        _estado.value = EstadoSessao.Falhou(resultado.mensagem, resultado.semConexao)
+                        // A rede pode ter voltado DURANTE a tentativa: sem isto o app
+                        // ficaria parado em "sem conexão" até alguém tocar no botão.
+                        if (resultado.semConexao) agendarNovaTentativa()
+                    }
                 }
             } finally {
                 trava.unlock()
@@ -105,6 +161,9 @@ class SessaoViewModel : ViewModel() {
         }
     }
 }
+
+private const val ESPERA_INICIAL = 3_000L
+private const val ESPERA_MAXIMA = 60_000L
 
 @Composable
 fun ConexaoTela(estado: EstadoSessao, aoTentarNovamente: () -> Unit) {

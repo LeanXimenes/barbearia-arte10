@@ -2,9 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "site",
+      "name": "site-demo",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "runtimeArgs": [
+        "run",
+        "dev:demo",
+        "--prefix",
+        "web"
+      ],
       "port": 5173
     }
   ]

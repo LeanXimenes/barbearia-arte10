@@ -1,69 +1,65 @@
 # Banco de dados (Supabase)
 
-O banco é a fonte oficial dos dados. O site e o aplicativo só leem e escrevem
+O banco é a fonte oficial dos dados. O site e o aplicativo só leem e gravam
 através dele, com as regras aplicadas no servidor.
 
----
-
-## 1. Criar o projeto
-
-1. Entre em <https://supabase.com> e crie um projeto novo.
-2. Escolha a região mais próxima (para o Brasil: **South America (São Paulo)**).
-3. Guarde a senha do banco — ela é pedida uma vez só.
-
-Em **Project Settings → API** você encontra os dois valores usados pelo site e
-pelo aplicativo:
-
-| Valor | Onde usar |
-|---|---|
-| `Project URL` | `VITE_SUPABASE_URL` / `SUPABASE_URL` |
-| `anon public` | `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` |
-| `service_role` | **em lugar nenhum do site ou do app.** Só na Edge Function. |
+> Guia rápido e ilustrado: **`docs/Guia-colocar-o-site-no-ar.pdf`**.
+> Este arquivo é a referência completa.
 
 ---
 
-## 2. Aplicar as migrações
+## 1. Instalar o banco (um arquivo só)
 
-### Opção A — pelo painel (mais simples)
+1. Abra o **SQL Editor** do projeto:
+   `https://supabase.com/dashboard/project/SEU-PROJETO/sql/new`
+2. Abra `supabase/instalar_tudo.sql` no Bloco de Notas, copie **tudo** e cole
+   no editor.
+3. Clique em **Run**. O Supabase avisa que o script tem comandos `drop`
+   ("destructive operation") — é esperado: são só `drop ... if exists` para o
+   script poder ser rodado de novo. Confirme em **Run this query**.
+4. A última linha do resultado deve dizer
+   *"Barbearia Arte 10: banco instalado com sucesso."*
 
-Abra **SQL Editor** e cole o conteúdo de cada arquivo, **na ordem do nome**:
+O instalador pode ser rodado de novo sem estragar nada. Ele é gerado a partir
+de `supabase/migrations/` + `supabase/seed.sql`:
 
+```bash
+node supabase/gerar_instalador.mjs
 ```
-supabase/migrations/20260101000100_extensoes_e_enums.sql
-supabase/migrations/20260101000200_tabelas.sql
-supabase/migrations/20260101000300_regras_de_integridade.sql
-supabase/migrations/20260101000400_funcoes_disponibilidade.sql
-supabase/migrations/20260101000500_funcao_criar_agendamento.sql
-supabase/migrations/20260101000600_funcoes_admin.sql
-supabase/migrations/20260101000700_rls_e_permissoes.sql
-supabase/migrations/20260101000800_notificacoes_e_realtime.sql
-supabase/migrations/20260101000900_visoes_do_aplicativo.sql
-```
 
-Depois rode `supabase/seed.sql` uma vez.
+(A suíte de testes falha se o `instalar_tudo.sql` estiver desatualizado.)
 
-### Opção B — pela CLI
+### Alternativa: Supabase CLI
 
 ```bash
 npx supabase login
-npx supabase link --project-ref SEU_PROJECT_REF
-npx supabase db push
+npx supabase link --project-ref SEU-PROJETO
+npx supabase db push --include-seed
 ```
 
 ---
 
-## 3. Preencher os dados da barbearia
+## 2. Chaves
 
-O `seed.sql` deixa os campos de contato em branco de propósito, para o site não
-publicar um endereço inventado. Preencha de um destes jeitos:
+Em **Project Settings → API Keys**:
 
-- **Pelo aplicativo:** aba *Ajustes* → *Editar dados*. É o caminho normal do
-  dia a dia.
-- **Pelo SQL Editor**, se preferir fazer agora:
+| Chave | Pode ir no site / app? |
+|---|---|
+| **Publishable** (`sb_publishable_...`) ou a antiga **anon** | Sim — é pública por natureza. Vai em `VITE_SUPABASE_PUBLISHABLE_KEY` (site) e `SUPABASE_ANON_KEY` (app). |
+| **Secret** (`sb_secret_...`) / antiga **service_role** | **Nunca.** Só existe dentro da Edge Function, no servidor. |
+| Senha do banco | Nunca em código nem em chat. |
+
+---
+
+## 3. Dados da barbearia
+
+O seed deixa contato e endereço em branco de propósito (para não publicar um
+endereço inventado). Preencha pelo aplicativo (**Ajustes → Editar dados**) ou
+no SQL Editor:
 
 ```sql
 update public.config_barbearia set
-  telefone_whatsapp = '17999999999',        -- só números, com DDD
+  telefone_whatsapp = '17999999999',   -- só números, com DDD
   instagram         = 'barbeariaarte10',
   endereco          = 'Rua Exemplo, 123 - Centro',
   cidade            = 'Sua Cidade',
@@ -71,7 +67,7 @@ update public.config_barbearia set
 where id;
 ```
 
-Os horários de funcionamento vêm preenchidos assim (também editáveis no app):
+Horários de funcionamento iniciais (editáveis no app, em **Ajustes**):
 
 | Dia | Expediente | Intervalo |
 |---|---|---|
@@ -82,79 +78,93 @@ Os horários de funcionamento vêm preenchidos assim (também editáveis no app)
 
 ---
 
-## 4. Criar o usuário do proprietário
+## 4. Conta do aplicativo do barbeiro (o app não tem login)
 
-Entrar no aplicativo exige duas coisas: uma conta no Supabase Auth **e** um
-registro em `public.administradores`. Ter só a conta não dá acesso a nada.
+O app entra sozinho com uma **conta dedicada**. Crie uma vez:
 
-1. **Authentication → Users → Add user**: informe e-mail e senha, e marque
-   *Auto Confirm User*.
-2. No **SQL Editor**:
+1. **Authentication → Users → Add user → Create new user**
+   - e-mail: por exemplo `app@barbeariaarte10.com.br`
+   - senha: **longa e aleatória** (ninguém vai digitá-la; ela só vai no
+     `local.properties` na hora de gerar o app)
+   - marque **Auto Confirm User**
+2. No SQL Editor, libere a conta como administradora:
 
 ```sql
 insert into public.administradores (user_id, nome)
-select id, 'Proprietário'
+select id, 'App do barbeiro'
   from auth.users
- where email = 'proprietario@barbeariaarte10.com.br'
+ where email = 'app@barbeariaarte10.com.br'
 on conflict (user_id) do update set ativo = true;
 ```
 
-3. Em **Authentication → Providers → Email**, **desligue** *Enable Sign Ups*.
-   Ninguém precisa criar conta: só o proprietário entra, e a conta dele já
-   existe.
+3. **Authentication → Sign In / Providers**: desligue **Allow new users to
+   sign up**. O site não usa login e ninguém precisa criar conta.
+
+### Celular perdido / cortar o acesso
+
+```sql
+update public.administradores set ativo = false
+ where user_id = (select id from auth.users where email = 'app@barbeariaarte10.com.br');
+```
+
+Tem efeito imediato: o RLS nega tudo para essa conta e os aparelhos dela
+param de receber push. Depois, troque a senha em **Authentication → Users**,
+gere o app de novo com a senha nova e volte `ativo = true`.
 
 ---
 
-## 5. Ligar o Realtime
+## 5. Realtime
 
-Em **Database → Replication → `supabase_realtime`**, confirme que estas tabelas
-estão publicadas (a migração `..._notificacoes_e_realtime.sql` já tenta fazer
-isso automaticamente):
+O instalador já publica as tabelas. Confira em **Database → Publications →
+supabase_realtime**:
 
-- `agenda_publica` — assinada pelo **site**, sem nenhum dado pessoal
-- `agendamentos` e `bloqueios` — assinadas pelo **aplicativo** do proprietário
-- `servicos` e `config_horarios` — para o site refletir mudanças na hora
+- `agenda_publica` — assinada pelo **site** (sem nenhum dado pessoal)
+- `agendamentos` e `bloqueios` — assinadas pelo **aplicativo**
+- `servicos` e `config_horarios` — o site reflete mudanças na hora
 
 ---
 
-## 6. Ligar as notificações push
+## 6. Notificações push
 
-Faça primeiro o [guia do aplicativo](APLICATIVO.md#notificações-push), que
-gera as credenciais do Firebase. Depois:
+Precisa do Firebase (veja [APLICATIVO.md](APLICATIVO.md#2-notificações-push)).
 
-```bash
-npx supabase functions deploy notificar-agendamento
+1. **Database → Extensions**: habilite **pg_net** e **pg_cron**.
+2. Publique a função (PowerShell, na pasta `C:\arte10`):
 
-npx supabase secrets set \
-  FIREBASE_PROJECT_ID="seu-projeto-firebase" \
-  FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@seu-projeto.iam.gserviceaccount.com" \
-  FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMII...\n-----END PRIVATE KEY-----\n" \
-  EDGE_TOKEN="um-segredo-longo-e-aleatorio"
+```powershell
+npx supabase login
+npx supabase functions deploy notificar-agendamento --no-verify-jwt --project-ref SEU-PROJETO
 ```
 
-Habilite a extensão **`pg_net`** em *Database → Extensions* e diga ao banco
-onde a função mora:
+3. **Edge Functions → Secrets** (ou `npx supabase secrets set ...`):
+
+| Secret | Valor |
+|---|---|
+| `FIREBASE_PROJECT_ID` | `project_id` da conta de serviço |
+| `FIREBASE_CLIENT_EMAIL` | `client_email` da conta de serviço |
+| `FIREBASE_PRIVATE_KEY` | `private_key` inteira (com `-----BEGIN...`) |
+| `EDGE_TOKEN` | um texto longo e aleatório (24+ caracteres) |
+
+4. Abra `supabase/ativar_push.sql`, troque a URL da função e o mesmo
+   `EDGE_TOKEN`, e rode no SQL Editor. Ele grava a configuração e agenda o
+   reenvio automático a cada 2 minutos.
+
+Se o push falhar, **o agendamento continua valendo**. O motivo fica em
+`public.notificacoes.erro` (ex.: `Edge Function respondeu HTTP 401`) e o envio
+é tentado de novo. Para conferir:
 
 ```sql
-insert into private.segredos (chave, valor) values
-  ('edge_notificacoes_url',   'https://SEU-PROJETO.supabase.co/functions/v1/notificar-agendamento'),
-  ('edge_notificacoes_token', 'um-segredo-longo-e-aleatorio')   -- igual ao EDGE_TOKEN
-on conflict (chave) do update set valor = excluded.valor, updated_at = now();
+select created_at, status, tentativas, disparos, erro
+  from public.notificacoes order by created_at desc limit 10;
 ```
 
-Opcional, mas recomendado — reenviar o que falhou, de 2 em 2 minutos
-(extensão `pg_cron`):
+---
 
-```sql
-select cron.schedule(
-  'reenviar-notificacoes',
-  '*/2 * * * *',
-  $$ select public.reenviar_notificacoes_pendentes(20) $$
-);
-```
+## 7. Antes de divulgar o site: apagar os testes
 
-Se o push falhar, **o agendamento continua válido**. A notificação fica
-`pendente` e é reenviada; nada do fluxo do cliente depende disso.
+Agendamento de cliente é permanente (regra do sistema). Faça seus testes com
+o nome começando por **TESTE** e, **antes de divulgar**, rode
+`supabase/limpar_testes.sql`. Depois do lançamento, não use.
 
 ---
 
@@ -166,46 +176,38 @@ Se o push falhar, **o agendamento continua válido**. A notificação fica
 |---|---|
 | `clientes` | Nome e telefone. O telefone é único e identifica o cliente. |
 | `servicos` | Nome, descrição, preço, duração e ativo/inativo. |
-| `agendamentos` | As reservas. **Imutáveis** (ver abaixo). |
-| `bloqueios` | Períodos fechados manualmente pelo proprietário. |
+| `agendamentos` | As reservas. **Imutáveis**. Guardam uma "fotografia" do nome do cliente e do serviço. |
+| `bloqueios` | Períodos fechados manualmente pelo dono. |
 | `agenda_publica` | Espelho dos períodos ocupados, sem dado pessoal. É o que o site anônimo enxerga. |
-| `config_barbearia` | Registro único: contato, endereço, grade de horários, janela de agendamento. |
+| `config_barbearia` | Registro único: contato, endereço, grade, janela de agendamento, limites. |
 | `config_horarios` | Expediente e intervalo de cada dia da semana. |
 | `administradores` | Liga um usuário do Auth ao papel de administrador. |
-| `dispositivos_push` | Tokens FCM dos aparelhos do proprietário. |
-| `notificacoes` | Caixa de saída dos pushes, com status e tentativas. |
-| `private.segredos` | URL e token da Edge Function. Sem grant para ninguém. |
+| `dispositivos_push` | Tokens FCM dos aparelhos. |
+| `notificacoes` | Fila dos pushes, com status, tentativas e erro. |
+| `private.segredos` | URL e token da Edge Function. Sem acesso para ninguém da API. |
 
 ### Funções
 
 | Função | Quem chama | O que faz |
 |---|---|---|
-| `horarios_disponiveis(servico, data)` | site | Grade do dia com `disponivel` e o motivo (`ocupado` / `bloqueado`). |
-| `dias_disponiveis(servico, início, fim)` | site | Para cada dia: aberto? dentro da janela? quantos horários livres? |
-| `criar_agendamento(...)` | site | **Único** caminho de gravação. Revalida tudo e devolve JSON. |
-| `agenda_do_dia(data)` | app | Linha do tempo completa: agendado / bloqueado / livre / intervalo. |
-| `visao_geral_periodo(início, fim)` | app | Contagens por dia, para pintar o calendário. |
-| `criar_bloqueio(...)` | app | Fecha um período livre. Recusa se houver cliente agendado. |
-| `remover_bloqueio(id)` | app | Libera um bloqueio. **Só mexe em `bloqueios`.** |
-| `atualizar_status_agendamento(id, status)` | app | Registra o desfecho. Não libera o horário. |
-| `registrar_dispositivo(token, modelo)` | app | Guarda o token FCM do aparelho. |
+| `horarios_disponiveis(servico, data)` | site | Grade do dia, com `disponivel` e o motivo (`ocupado` / `bloqueado`). |
+| `dias_disponiveis(servico, início, fim)` | site | Por dia: abre? dentro da janela? quantos horários livres? |
+| `criar_agendamento(...)` | site | **Único** caminho de gravação. Revalida tudo, idempotente, com freio anti-robô. |
+| `agenda_do_dia(data)` | app | Linha do tempo: agendado / bloqueado / livre (na mesma grade do site) / intervalo. |
+| `visao_geral_periodo(início, fim)` | app | Contagens por dia para o calendário. |
+| `criar_bloqueio(...)` / `remover_bloqueio(id)` | app | Fecha / libera um período. Nunca toca em agendamento de cliente. |
+| `atualizar_status_agendamento(id, status)` | app | Desfecho (atendido / faltou), só depois do horário. Não libera o horário. |
+| `registrar_dispositivo(token, modelo)` | app | Guarda o token de push do aparelho. |
+| `reservar_notificacao` / `finalizar_notificacao` / `destinos_push` | Edge Function | Envio de push sem duplicar e só para administradores ativos. |
 
 ### Por que um agendamento não pode ser apagado
 
-```sql
--- Trigger em public.agendamentos
-create trigger trg_agendamentos_sem_exclusao
-  before delete on public.agendamentos
-  for each row execute function public.tg_agendamento_imutavel();
-```
+- gatilho `BEFORE DELETE` e `BEFORE UPDATE` que recusa apagar ou mudar data,
+  horário, cliente, serviço ou valores;
+- gatilho `BEFORE TRUNCATE` (inclusive em cascata a partir de `clientes` ou
+  `servicos`);
+- o app não tem `DELETE` nem `UPDATE` na tabela — só a função de status;
+- o status só muda depois do horário e nenhum status libera o horário.
 
-Além do trigger:
-
-- `authenticated` não tem `GRANT DELETE` na tabela;
-- não existe policy de `DELETE`;
-- o `UPDATE` permitido só alcança `status` e `observacoes`;
-- o enum `agendamento_status` tem apenas `agendado`, `concluido` e
-  `nao_compareceu` — **nenhum deles libera o horário**.
-
-Para apagar um registro seria preciso um DBA desabilitando o trigger
-explicitamente no banco. É de propósito.
+A única forma de apagar é o dono do banco desligar o gatilho de propósito,
+como faz o `limpar_testes.sql` (só para antes do lançamento).

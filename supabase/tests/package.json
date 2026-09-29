@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Suite de testes do banco da Barbearia Arte 10 (PostgreSQL embarcado via PGlite).",
   "scripts": {
-    "test": "node run.mjs"
+    "test": "node run.mjs && node --test fcm.test.mjs instalador.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17"

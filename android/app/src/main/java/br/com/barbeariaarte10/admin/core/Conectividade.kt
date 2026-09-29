@@ -19,11 +19,17 @@ class Conectividade(context: Context) {
     private val gerenciador =
         context.applicationContext.getSystemService(ConnectivityManager::class.java)
 
+    /**
+     * "Tem uma rede com internet". Não exige a validação do Android
+     * (NET_CAPABILITY_VALIDATED): em redes que bloqueiam o teste de
+     * conectividade do Google o app mostraria "sem conexão" para sempre,
+     * mesmo alcançando o Supabase. Se a rede não funcionar de verdade, a
+     * própria requisição falha e é tratada como falta de conexão.
+     */
     fun estaOnline(): Boolean {
         val rede = gerenciador?.activeNetwork ?: return false
         val capacidades = gerenciador.getNetworkCapabilities(rede) ?: return false
-        return capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     fun observar(): Flow<Boolean> = callbackFlow {

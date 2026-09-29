@@ -53,6 +53,11 @@ export async function comoUsuarioComum(db, userId, fn) {
   return executarEmTransacao(db, 'authenticated', userId, fn)
 }
 
+/** Papel usado pela Edge Function (chave service_role, só no servidor). */
+export async function comoServico(db, fn) {
+  return executarEmTransacao(db, 'service_role', null, fn)
+}
+
 async function executarEmTransacao(db, papel, userId, fn) {
   const claims = userId
     ? JSON.stringify({ sub: userId, role: papel })

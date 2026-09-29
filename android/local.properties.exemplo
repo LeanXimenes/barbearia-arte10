@@ -4,9 +4,9 @@
 sdk.dir=C\:\Users\SEU_USUARIO\AppData\Local\Android\Sdk
 
 # Endereco e chave PUBLICA do Supabase (as mesmas do site).
-# Somente a chave "anon". A service_role key nunca entra no aplicativo.
+# Somente a chave PUBLICA (publishable ou anon). A secret/service_role nunca entra no aplicativo.
 SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_ANON_KEY=sua-anon-key-publica
+SUPABASE_ANON_KEY=sb_publishable_sua-chave-publica
 
 # Conta dedicada do aplicativo do barbeiro. O app entra sozinho com ela,
 # sem tela de login. Crie o usuario no Supabase (Authentication > Users),

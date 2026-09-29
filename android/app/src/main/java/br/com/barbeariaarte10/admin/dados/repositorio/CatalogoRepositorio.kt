@@ -1,6 +1,7 @@
 package br.com.barbeariaarte10.admin.dados.repositorio
 
 import br.com.barbeariaarte10.admin.core.MSG_FALHA_SALVAR
+import br.com.barbeariaarte10.admin.core.MSG_NAO_SALVO_SEM_CONEXAO
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.core.Supabase
 import br.com.barbeariaarte10.admin.core.executar
@@ -37,13 +38,24 @@ class CatalogoRepositorio {
     }
 
     suspend fun criarServico(servico: ServicoEdicao): Resultado<Unit> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.from("servicos").insert(servico)
         }
 
     suspend fun atualizarServico(id: String, servico: ServicoEdicao): Resultado<Unit> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
-            supabase.from("servicos").update(servico) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            // Campo a campo (com null explícito) para que apagar a descrição
+            // realmente limpe o valor no banco.
+            supabase.from("servicos").update(
+                {
+                    set("nome", servico.nome)
+                    set("descricao", servico.descricao)
+                    set("preco", servico.preco)
+                    set("duracao_minutos", servico.duracaoMinutos)
+                    set("ativo", servico.ativo)
+                    set("ordem", servico.ordem)
+                },
+            ) {
                 filter { eq("id", id) }
             }
         }
@@ -53,7 +65,7 @@ class CatalogoRepositorio {
      * já usou o serviço continua intacto.
      */
     suspend fun definirAtivo(id: String, ativo: Boolean): Resultado<Unit> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.from("servicos").update({ set("ativo", ativo) }) {
                 filter { eq("id", id) }
             }
@@ -68,7 +80,7 @@ class CatalogoRepositorio {
     }
 
     suspend fun salvarFuncionamento(dia: HorarioFuncionamento): Resultado<Unit> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.from("config_horarios").update(
                 {
                     set("aberto", dia.aberto)
@@ -91,7 +103,7 @@ class CatalogoRepositorio {
     }
 
     suspend fun salvarConfig(config: ConfigBarbearia): Resultado<Unit> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.from("config_barbearia").update(
                 {
                     set("nome", config.nome)
@@ -114,13 +126,19 @@ class CatalogoRepositorio {
     // --------------------------------------------------- clientes
 
     suspend fun clientes(busca: String = ""): Resultado<List<ClienteResumo>> = executar {
+        // Só letras, números e espaços: vírgulas, parênteses e curingas
+        // quebrariam o filtro "or" do PostgREST.
+        val texto = busca.filter { it.isLetterOrDigit() || it == ' ' }.trim()
+        val digitos = texto.filter { it.isDigit() }
+
         supabase.from("clientes_resumo")
             .select {
-                if (busca.isNotBlank()) {
+                if (texto.isNotEmpty()) {
                     filter {
                         or {
-                            ilike("nome", "%$busca%")
-                            ilike("telefone", "%${busca.filter { c -> c.isDigit() }}%")
+                            ilike("nome", "%$texto%")
+                            // Sem dígitos, "telefone ilike %%" casaria com todo mundo.
+                            if (digitos.isNotEmpty()) ilike("telefone", "%$digitos%")
                         }
                     }
                 }

@@ -47,11 +47,19 @@ class ServicoMensagens : FirebaseMessagingService() {
 
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** O Firebase gera/renova o token; guardamos no Supabase. */
+    /**
+     * O Firebase gera/renova o token — às vezes com o app FECHADO. Garante
+     * a sessão antes (a conta do app entra sozinha) para o token novo não se
+     * perder; se falhar agora, a próxima abertura do app registra de novo.
+     */
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         escopo.launch {
-            runCatching { Grafo.catalogo.registrarDispositivo(token, modeloDoAparelho()) }
+            runCatching {
+                if (Grafo.autenticacao.garantirSessao()) {
+                    Grafo.catalogo.registrarDispositivo(token, modeloDoAparelho())
+                }
+            }
         }
     }
 
@@ -63,7 +71,7 @@ class ServicoMensagens : FirebaseMessagingService() {
         val corpo = mensagem.notification?.body ?: dados["corpo"]
             ?: "Um cliente acabou de marcar um horário."
 
-        exibirNotificacao(this, titulo, corpo, dados[CHAVE_DATA_FCM])
+        exibirNotificacao(this, titulo, corpo, dados[CHAVE_DATA_FCM], dados["agendamento_id"])
     }
 }
 
@@ -75,6 +83,7 @@ fun exibirNotificacao(
     titulo: String,
     corpo: String,
     dataDoAgendamento: String? = null,
+    agendamentoId: String? = null,
 ) {
     // POST_NOTIFICATIONS só existe a partir do Android 13. Antes disso
     // checkSelfPermission devolveria "negado" e nada seria mostrado.
@@ -88,7 +97,9 @@ fun exibirNotificacao(
     val gerenciador = NotificationManagerCompat.from(contexto)
     if (!gerenciador.areNotificationsEnabled()) return
 
-    val id = proximoId.getAndIncrement()
+    // Mesmo agendamento = mesma notificação (um aviso repetido substitui o
+    // anterior). Sem id do agendamento, usa um contador.
+    val id = agendamentoId?.hashCode() ?: proximoId.getAndIncrement()
 
     val intencao = Intent(contexto, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -117,7 +128,7 @@ fun exibirNotificacao(
         .build()
 
     try {
-        gerenciador.notify(id, notificacao)
+        gerenciador.notify(agendamentoId, id, notificacao)
     } catch (_: SecurityException) {
         // Permissão revogada entre a checagem e o envio: não há o que fazer.
     }
@@ -143,7 +154,8 @@ suspend fun sincronizarTokenPush(): Boolean {
 
     return runCatching {
         val token = FirebaseMessaging.getInstance().token.await()
-        Grafo.catalogo.registrarDispositivo(token, modeloDoAparelho()) is Resultado.Sucesso
+        val resposta = Grafo.catalogo.registrarDispositivo(token, modeloDoAparelho())
+        (resposta as? Resultado.Sucesso)?.dado?.ok == true
     }.getOrDefault(false)
 }
 

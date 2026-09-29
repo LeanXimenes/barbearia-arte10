@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Como colocar o site da Barbearia Arte 10 no ar</title>
+<style>
+  @page { size: A4; margin: 15mm 15mm 16mm 15mm; }
+  :root {
+    --azul: #013681;
+    --azul-escuro: #0b1b3f;
+    --ouro: #c9a437;
+    --ouro-claro: #fdf3c8;
+    --cinza: #5b6474;
+    --borda: #d9dee8;
+    --verde: #166534;
+    --verde-claro: #e8f6ec;
+    --alerta: #8a5a00;
+    --alerta-claro: #fff4d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: #1d2433;
+  }
+  h1, h2, h3 { margin: 0; line-height: 1.2; }
+  a { color: var(--azul); text-decoration: none; word-break: break-all; }
+
+  .capa {
+    display: flex; align-items: center; gap: 18px;
+    background: var(--azul); color: #fff;
+    border-radius: 14px; padding: 18px 22px; margin-bottom: 16px;
+  }
+  .capa img { width: 92px; height: 92px; border-radius: 12px; border: 2px solid rgba(250,223,104,.6); }
+  .capa h1 { font-size: 21pt; color: #fadf68; letter-spacing: .01em; }
+  .capa p { margin: 6px 0 0; color: #dbe4f8; font-size: 10.5pt; }
+
+  .resumo {
+    border: 1px solid var(--borda); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+    background: #f7f9fc;
+  }
+  .resumo h2 { font-size: 12pt; color: var(--azul); margin-bottom: 8px; }
+  .resumo ol { margin: 0; padding-left: 20px; }
+  .resumo li { margin: 3px 0; }
+  .tempo { color: var(--cinza); font-size: 9.5pt; }
+
+  .etapa { margin: 16px 0 6px; display: flex; align-items: center; gap: 10px; break-after: avoid; }
+  .etapa .num {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--azul); color: #fadf68;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13pt; flex-shrink: 0;
+  }
+  .etapa h2 { font-size: 14pt; color: var(--azul-escuro); }
+  .etapa .tempo { margin-left: auto; }
+
+  ol.passos { margin: 6px 0 10px; padding-left: 22px; }
+  ol.passos > li { margin: 6px 0; padding-left: 2px; }
+  ol.passos > li::marker { font-weight: 700; color: var(--azul); }
+
+  code, .cmd {
+    font-family: Consolas, "Courier New", monospace; font-size: 9.5pt;
+    background: #eef2f8; border: 1px solid #dde4ef; border-radius: 4px; padding: 1px 5px;
+  }
+  pre {
+    font-family: Consolas, "Courier New", monospace; font-size: 9pt; line-height: 1.45;
+    background: #0f1b33; color: #e6ecf8; border-radius: 8px; padding: 10px 12px;
+    white-space: pre-wrap; word-break: break-word; margin: 6px 0 8px; break-inside: avoid;
+  }
+  pre .c { color: #9fb1d4; }
+  pre .t { color: #fadf68; }
+
+  .caixa { border-radius: 10px; padding: 9px 13px; margin: 8px 0; break-inside: avoid; font-size: 10pt; }
+  .caixa b:first-child { display: block; margin-bottom: 2px; }
+  .ok { background: var(--verde-claro); border: 1px solid #bfe3ca; color: var(--verde); }
+  .atencao { background: var(--alerta-claro); border: 1px solid #f1d98f; color: var(--alerta); }
+  .info { background: #eef3ff; border: 1px solid #cfdcff; color: #1d3b8a; }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.6pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--borda); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1f4f9; color: var(--azul-escuro); }
+
+  .quebra { break-before: page; }
+  .dado { font-family: Consolas, monospace; font-size: 9.5pt; }
+  .rodape { margin-top: 18px; color: var(--cinza); font-size: 9pt; border-top: 1px solid var(--borda); padding-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <img src="logo.jpg" alt="" />
+  <div>
+    <h1>Como colocar o site no ar</h1>
+    <p>Barbearia Arte 10 · passo a passo para Windows<br />
+       Seu projeto Supabase: <b>iwekfmxrmmmxzjymtsyq</b></p>
+  </div>
+</div>
+
+<div class="resumo">
+  <h2>Resumo — são 4 etapas</h2>
+  <ol>
+    <li><b>Criar o banco</b> — colar um arquivo no Supabase e clicar em Run. <span class="tempo">(5 min)</span></li>
+    <li><b>Colocar os dados da barbearia</b> — endereço, WhatsApp e Instagram. <span class="tempo">(3 min)</span></li>
+    <li><b>Publicar o site</b> — gerar o site e arrastar para o Netlify. <span class="tempo">(10 min)</span></li>
+    <li><b>Testar</b> — fazer um agendamento de teste e limpar antes de divulgar. <span class="tempo">(5 min)</span></li>
+  </ol>
+  <p class="tempo" style="margin:8px 0 0">O aplicativo do barbeiro e os avisos no celular vêm depois (página final). O site funciona sem eles.</p>
+</div>
+
+<div class="caixa info">
+  <b>Tudo já está preparado neste computador</b>
+  A pasta do projeto é <code>C:\arte10</code>. O endereço e a chave pública do seu Supabase já estão
+  configurados no arquivo <code>C:\arte10\web\.env</code>.
+</div>
+
+<!-- ============================================================ -->
+<div class="etapa"><div class="num">1</div><h2>Criar o banco de dados</h2><span class="tempo">5 min</span></div>
+
+<ol class="passos">
+  <li>Abra o editor de SQL do seu projeto (entre com sua conta do Supabase se pedir):<br />
+      <a href="https://supabase.com/dashboard/project/iwekfmxrmmmxzjymtsyq/sql/new">https://supabase.com/dashboard/project/iwekfmxrmmmxzjymtsyq/sql/new</a></li>
+  <li>No Windows, abra a pasta <code>C:\arte10\supabase</code>. Clique com o botão direito em
+      <b>instalar_tudo.sql</b> → <b>Abrir com</b> → <b>Bloco de Notas</b>.</li>
+  <li>No Bloco de Notas aperte <b>Ctrl + A</b> (seleciona tudo) e depois <b>Ctrl + C</b> (copia).</li>
+  <li>Volte ao Supabase, clique dentro da área de texto do editor e aperte <b>Ctrl + V</b> (cola).</li>
+  <li>Clique no botão verde <b>Run</b> (ou aperte <b>Ctrl + Enter</b>).</li>
+  <li>O Supabase vai mostrar um aviso de <i>"destructive operation"</i>. <b>É normal</b>: o arquivo só
+      apaga coisas que ainda não existem, para poder ser rodado de novo com segurança.
+      Clique em <b>Run this query</b>.</li>
+</ol>
+
+<div class="caixa ok">
+  <b>Deu certo quando…</b>
+  aparece embaixo, no resultado: <i>"Barbearia Arte 10: banco instalado com sucesso."</i>
+  Se der algum erro no meio, pode rodar o arquivo inteiro de novo — ele não duplica nada.
+</div>
+
+<p style="margin:10px 0 4px"><b>Última coisa desta etapa — desligar o cadastro público</b> (o site não usa login e ninguém precisa criar conta):</p>
+<ol class="passos">
+  <li>Abra <a href="https://supabase.com/dashboard/project/iwekfmxrmmmxzjymtsyq/auth/providers">Authentication → Sign In / Providers</a>.</li>
+  <li>Desligue <b>Allow new users to sign up</b> e clique em <b>Save</b>.</li>
+</ol>
+
+<!-- ============================================================ -->
+<div class="etapa"><div class="num">2</div><h2>Colocar os dados da barbearia</h2><span class="tempo">3 min</span></div>
+
+<p style="margin:4px 0">No mesmo editor de SQL, clique em <b>New query</b>, cole o texto abaixo, <b>troque o que está entre aspas
+pelos seus dados</b> e clique em <b>Run</b>:</p>
+
+<pre><span class="c">-- Dados que aparecem no site (dá para mudar depois pelo app)</span>
+update public.config_barbearia set
+  telefone_whatsapp = <span class="t">'17999999999'</span>,          <span class="c">-- só números, com DDD</span>
+  instagram         = <span class="t">'barbeariaarte10'</span>,      <span class="c">-- sem o @</span>
+  endereco          = <span class="t">'Rua Exemplo, 123 - Centro'</span>,
+  cidade            = <span class="t">'Sua Cidade'</span>,
+  uf                = <span class="t">'SP'</span>
+where id;</pre>
+
+<p style="margin:6px 0 4px">Horários que já vêm configurados (mude pelo app do barbeiro, em <b>Ajustes</b>):</p>
+<table>
+  <tr><th>Dia</th><th>Horário</th><th>Intervalo</th></tr>
+  <tr><td>Segunda a quinta</td><td>09:00 às 19:00</td><td>12:00 às 13:30</td></tr>
+  <tr><td>Sexta</td><td>09:00 às 20:00</td><td>12:00 às 13:30</td></tr>
+  <tr><td>Sábado</td><td>08:00 às 18:00</td><td>—</td></tr>
+  <tr><td>Domingo</td><td colspan="2">Fechado</td></tr>
+</table>
+<p class="tempo" style="margin:0">Serviços que já vêm cadastrados: Corte (35 min · R$ 35), Barba (30 min · R$ 30), Corte + Barba (60 min · R$ 60),
+Pezinho (20 min · R$ 15) e Sobrancelha (10 min · R$ 5). Preços e durações também se mudam pelo app.</p>
+
+<!-- ============================================================ -->
+<div class="quebra"></div>
+<div class="etapa"><div class="num">3</div><h2>Publicar o site no Netlify</h2><span class="tempo">10 min</span></div>
+
+<p style="margin:4px 0 6px"><b>Parte A — gerar o site</b> (cria a pasta com os arquivos prontos):</p>
+<ol class="passos">
+  <li>Aperte a tecla <b>Windows</b>, digite <b>PowerShell</b> e aperte <b>Enter</b>.</li>
+  <li>Digite os comandos abaixo, um de cada vez, apertando <b>Enter</b> depois de cada um:</li>
+</ol>
+<pre><span class="t">cd C:\arte10\web</span>
+<span class="t">npm install</span>        <span class="c"># só precisa na primeira vez (demora um pouco)</span>
+<span class="t">npm run build</span></pre>
+<div class="caixa ok">
+  <b>Deu certo quando…</b>
+  aparece uma linha terminando com <i>"built in …s"</i>. A pasta <code>C:\arte10\web\dist</code> foi criada.
+</div>
+
+<p style="margin:10px 0 6px"><b>Parte B — colocar no ar</b>:</p>
+<ol class="passos">
+  <li>Abra <a href="https://app.netlify.com/drop">https://app.netlify.com/drop</a> e crie uma conta grátis (pode entrar com o Google).</li>
+  <li>Abra a pasta <code>C:\arte10\web</code> no Explorador de Arquivos e <b>arraste a pasta <code>dist</code></b>
+      para o quadro da página do Netlify.</li>
+  <li>Em alguns segundos o site está no ar, com um endereço parecido com
+      <span class="dado">https://nome-aleatorio.netlify.app</span>.</li>
+  <li>Para escolher um nome melhor: <b>Project configuration → Change project name</b> (em telas antigas: <i>Site configuration → Change site name</i>) → por exemplo
+      <span class="dado">barbeariaarte10</span> → o site vira <span class="dado">https://barbeariaarte10.netlify.app</span>.</li>
+</ol>
+
+<div class="caixa info">
+  <b>Para atualizar o site no futuro</b>
+  rode de novo <code>npm run build</code> no PowerShell e arraste a pasta <code>dist</code> na aba <b>Deploys</b> do seu site no Netlify.
+</div>
+
+<div class="caixa info">
+  <b>Opcional — foto do site ao mandar o link no WhatsApp</b>
+  Depois de saber o endereço final, abra <code>C:\arte10\web\.env</code> no Bloco de Notas e acrescente uma linha
+  <code>VITE_SITE_URL=https://barbeariaarte10.netlify.app</code> (com o seu endereço). Rode <code>npm run build</code> e arraste de novo.
+</div>
+
+<!-- ============================================================ -->
+<div class="etapa"><div class="num">4</div><h2>Testar antes de divulgar</h2><span class="tempo">5 min</span></div>
+
+<ol class="passos">
+  <li>Abra o endereço do seu site. Os serviços e os horários de funcionamento devem aparecer.</li>
+  <li>Clique em <b>Agendar horário</b>, escolha um serviço, um dia e um horário.</li>
+  <li>No nome, escreva algo que <b>comece com TESTE</b> (ex.: <i>TESTE Leandro</i>) e confirme.
+      Deve aparecer <b>"Agendamento confirmado!"</b>.</li>
+  <li>Abra o agendamento de novo: o horário que você marcou agora aparece como <b>"JÁ AGENDADO"</b>.</li>
+</ol>
+
+<div class="caixa atencao">
+  <b>Importante: agendamento não se apaga</b>
+  Pela regra do sistema, nenhum agendamento de cliente pode ser apagado — nem pelo app. Por isso, <b>antes de divulgar o site</b>,
+  apague os seus testes: no editor de SQL, abra <code>C:\arte10\supabase\limpar_testes.sql</code> (Bloco de Notas → Ctrl+A → Ctrl+C),
+  cole e clique em <b>Run</b>. Ele apaga só os agendamentos cujo nome começa com <b>TESTE</b>.
+  <b>Depois que os clientes começarem a agendar, não use mais esse arquivo.</b>
+</div>
+
+<!-- ============================================================ -->
+<div class="quebra"></div>
+<h2 style="color:var(--azul-escuro);font-size:14pt;margin-bottom:6px">Se algo não funcionar</h2>
+<table>
+  <tr><th style="width:42%">O que aparece</th><th>O que fazer</th></tr>
+  <tr><td>Faixa amarela no topo do site: <i>"Conexão com o banco não configurada"</i></td>
+      <td>O arquivo <code>C:\arte10\web\.env</code> sumiu ou está vazio. Ele deve ter as duas linhas
+          <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. Gere o site de novo (<code>npm run build</code>).</td></tr>
+  <tr><td><i>"Não conseguimos carregar os serviços agora"</i></td>
+      <td>O banco ainda não foi instalado (etapa 1) ou deu erro no meio. Rode o <code>instalar_tudo.sql</code> de novo.</td></tr>
+  <tr><td>Endereço, WhatsApp ou Instagram não aparecem</td>
+      <td>Faça a etapa 2. Campos em branco ficam escondidos de propósito.</td></tr>
+  <tr><td>Nenhum dia disponível no calendário</td>
+      <td>Confira os horários de funcionamento e se há serviços ativos. Domingo é fechado.</td></tr>
+  <tr><td><i>"Muitos agendamentos em pouco tempo"</i></td>
+      <td>É o freio contra robôs (20 agendamentos em 10 minutos). Em uso normal nunca aparece; nos testes, espere alguns minutos.</td></tr>
+  <tr><td><code>npm</code> não é reconhecido no PowerShell</td>
+      <td>Instale o Node.js (versão LTS) em <a href="https://nodejs.org">nodejs.org</a>, feche e abra o PowerShell de novo.</td></tr>
+</table>
+
+<h2 style="color:var(--azul-escuro);font-size:12.5pt;margin:16px 0 6px">Guarde com cuidado</h2>
+<table>
+  <tr><th>Pode ficar no site e no app (é pública)</th><th>Nunca compartilhe</th></tr>
+  <tr><td>Endereço do projeto e a chave <b>publishable</b><br /><span class="dado">sb_publishable_…</span></td>
+      <td>A chave <b>secret</b> (<span class="dado">sb_secret_…</span>), a senha do banco e o arquivo APK do app do barbeiro.</td></tr>
+</table>
+
+<h2 style="color:var(--azul-escuro);font-size:12.5pt;margin:16px 0 6px">Depois: app do barbeiro e avisos no celular</h2>
+<p style="margin:0 0 6px">O site já funciona sozinho. Quando quiser ligar o app do barbeiro (sem login, ele entra sozinho) e o aviso no celular a cada novo agendamento:</p>
+<ol class="passos">
+  <li><b>Conta do app:</b> em <a href="https://supabase.com/dashboard/project/iwekfmxrmmmxzjymtsyq/auth/users">Authentication → Users</a>
+      → <b>Add user</b> → e-mail (ex.: <span class="dado">app@barbeariaarte10.com.br</span>) e uma senha longa. Marque <b>Auto Confirm User</b>.
+      Depois libere a conta com o comando do arquivo <code>docs\SUPABASE.md</code> (seção 4).</li>
+  <li><b>Gerar o app:</b> preencha <code>C:\arte10\android\local.properties</code> (modelo em <code>local.properties.exemplo</code>)
+      e siga <code>docs\APLICATIVO.md</code>.</li>
+  <li><b>Avisos no celular:</b> Firebase + a função <b>notificar-agendamento</b> + o arquivo <code>supabase\ativar_push.sql</code>
+      (passo a passo em <code>docs\SUPABASE.md</code>, seção 6).</li>
+</ol>
+
+<div class="rodape">
+  Barbearia Arte 10 · guia gerado a partir de <code>docs/guia/guia-site-no-ar.html</code> · referência completa em <code>docs/</code>.
+</div>
+
+</body>
+</html>

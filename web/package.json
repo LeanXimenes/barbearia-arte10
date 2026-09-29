@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:demo": "vite --mode demo",
+    "api:demo": "node ../supabase/tests/servidor-local.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",

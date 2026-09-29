@@ -2,6 +2,7 @@ package br.com.barbeariaarte10.admin.dados.repositorio
 
 import br.com.barbeariaarte10.admin.Grafo
 import br.com.barbeariaarte10.admin.core.MSG_FALHA_SALVAR
+import br.com.barbeariaarte10.admin.core.MSG_NAO_SALVO_SEM_CONEXAO
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.core.Supabase
 import br.com.barbeariaarte10.admin.core.executar
@@ -17,7 +18,9 @@ import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -69,7 +72,7 @@ class AgendaRepositorio {
         inicio: String,
         fim: String,
         motivo: String?,
-    ): Resultado<RespostaSimples> = executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+    ): Resultado<RespostaSimples> = executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
         supabase.postgrest
             .rpc(
                 "criar_bloqueio",
@@ -86,7 +89,7 @@ class AgendaRepositorio {
 
     /** Desbloqueia (item 16). Só mexe na tabela de bloqueios. */
     suspend fun desbloquear(bloqueioId: String): Resultado<RespostaSimples> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.postgrest
                 .rpc("remover_bloqueio", buildJsonObject { put("p_id", bloqueioId) })
                 .decodeAs<RespostaSimples>()
@@ -94,7 +97,7 @@ class AgendaRepositorio {
 
     /** Registra o desfecho do atendimento — não libera o horário. */
     suspend fun atualizarStatus(agendamentoId: String, status: String): Resultado<RespostaSimples> =
-        executar(mensagemPadrao = MSG_FALHA_SALVAR) {
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
             supabase.postgrest
                 .rpc(
                     "atualizar_status_agendamento",
@@ -163,7 +166,18 @@ class AgendaRepositorio {
         launch { agendamentos.collect { send(Unit) } }
         launch { bloqueios.collect { send(Unit) } }
 
-        canal.subscribe()
+        // Sem internet o subscribe pode falhar: tenta de novo em vez de
+        // derrubar o app (o fluxo roda num escopo global).
+        while (true) {
+            try {
+                canal.subscribe()
+                break
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                delay(10_000)
+            }
+        }
 
         try {
             awaitCancellation()

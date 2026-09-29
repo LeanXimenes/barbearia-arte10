@@ -8,7 +8,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
  * key nunca deve ser usada no navegador.
  */
 const url = import.meta.env.VITE_SUPABASE_URL?.trim()
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
+// Aceita a chave nova (publishable) ou a antiga (anon). As duas são públicas.
+const anonKey = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+)?.trim()
 
 export const supabaseConfigurado = Boolean(url && anonKey)
 

@@ -133,12 +133,24 @@ type AoMudar = () => void
  * receber avisos de mudança com segurança.
  */
 export function assinarAgenda(aoMudar: AoMudar): () => void {
-  const canal = supabase
-    .channel('arte10-agenda')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_publica' }, aoMudar)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'servicos' }, aoMudar)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'config_horarios' }, aoMudar)
-    .subscribe()
+  return assinar(['agenda_publica'], aoMudar)
+}
+
+/** Serviços e horário de funcionamento (o que o dono muda pelo aplicativo). */
+export function assinarConteudo(aoMudar: AoMudar): () => void {
+  return assinar(['servicos', 'config_horarios'], aoMudar)
+}
+
+let proximoCanal = 0
+
+function assinar(tabelas: string[], aoMudar: AoMudar): () => void {
+  // Nome ÚNICO por assinatura: o realtime-js devolve o MESMO canal para um
+  // nome repetido, e fechar o diálogo derrubaria a assinatura da página.
+  let canal = supabase.channel(`arte10-${tabelas.join('-')}-${++proximoCanal}`)
+  for (const tabela of tabelas) {
+    canal = canal.on('postgres_changes', { event: '*', schema: 'public', table: tabela }, aoMudar)
+  }
+  canal.subscribe()
 
   return () => {
     void supabase.removeChannel(canal)

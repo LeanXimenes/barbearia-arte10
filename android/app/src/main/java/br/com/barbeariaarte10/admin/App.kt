@@ -5,6 +5,8 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,7 +55,11 @@ object Grafo {
         private set
 
     /** Escopo que vive enquanto o processo do app vive (canais realtime compartilhados). */
-    val escopoApp: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val escopoApp: CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            // Um erro inesperado num fluxo compartilhado não pode fechar o app.
+            CoroutineExceptionHandler { _, erro -> Log.w("Arte10", "Erro em segundo plano", erro) },
+    )
 
     val autenticacao: AutenticacaoRepositorio by lazy { AutenticacaoRepositorio() }
     val agenda: AgendaRepositorio by lazy { AgendaRepositorio() }

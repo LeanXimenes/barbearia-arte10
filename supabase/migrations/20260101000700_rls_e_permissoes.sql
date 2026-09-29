@@ -35,7 +35,7 @@ grant select on public.agenda_publica   to anon, authenticated;
 
 -- Area administrativa (o RLS ainda exige is_admin()).
 grant select         on public.clientes          to authenticated;
-grant select, update on public.agendamentos      to authenticated;
+grant select         on public.agendamentos      to authenticated;
 grant select         on public.bloqueios         to authenticated;
 grant select         on public.administradores   to authenticated;
 grant select, delete on public.dispositivos_push to authenticated;
@@ -59,8 +59,8 @@ drop policy if exists servicos_admin on public.servicos;
 create policy servicos_admin
   on public.servicos for all
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
 
 -- CONFIGURACAO: leitura livre (endereco, horarios de funcionamento).
 drop policy if exists config_barbearia_leitura on public.config_barbearia;
@@ -73,8 +73,8 @@ drop policy if exists config_barbearia_admin on public.config_barbearia;
 create policy config_barbearia_admin
   on public.config_barbearia for all
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
 
 drop policy if exists config_horarios_leitura on public.config_horarios;
 create policy config_horarios_leitura
@@ -86,8 +86,8 @@ drop policy if exists config_horarios_admin on public.config_horarios;
 create policy config_horarios_admin
   on public.config_horarios for all
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
 
 -- AGENDA PUBLICA: periodos ocupados, sem qualquer dado pessoal.
 -- Serve para o Realtime do site saber que precisa recarregar (item 18).
@@ -104,57 +104,53 @@ drop policy if exists clientes_admin_leitura on public.clientes;
 create policy clientes_admin_leitura
   on public.clientes for select
   to authenticated
-  using (public.is_admin());
+  using ((select public.is_admin()));
 
 -- AGENDAMENTOS: somente o administrador le.
--- Nao existe policy de INSERT (so via criar_agendamento) nem de DELETE
--- (item 14 — o agendamento do cliente e permanente).
+-- Nao existe policy de INSERT (so via criar_agendamento), de UPDATE (so via
+-- atualizar_status_agendamento) nem de DELETE (item 14 — o agendamento do
+-- cliente e permanente).
 drop policy if exists agendamentos_admin_leitura on public.agendamentos;
 create policy agendamentos_admin_leitura
   on public.agendamentos for select
   to authenticated
-  using (public.is_admin());
+  using ((select public.is_admin()));
 
 drop policy if exists agendamentos_admin_status on public.agendamentos;
-create policy agendamentos_admin_status
-  on public.agendamentos for update
-  to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
 
 -- BLOQUEIOS: o administrador le; criar/remover apenas pelas funcoes.
 drop policy if exists bloqueios_admin_leitura on public.bloqueios;
 create policy bloqueios_admin_leitura
   on public.bloqueios for select
   to authenticated
-  using (public.is_admin());
+  using ((select public.is_admin()));
 
 -- ADMINISTRADORES: cada usuario so enxerga o proprio vinculo.
 drop policy if exists administradores_proprio on public.administradores;
 create policy administradores_proprio
   on public.administradores for select
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 
 -- DISPOSITIVOS PUSH: cada administrador gerencia os proprios aparelhos.
 drop policy if exists dispositivos_push_proprios on public.dispositivos_push;
 create policy dispositivos_push_proprios
   on public.dispositivos_push for select
   to authenticated
-  using (user_id = auth.uid() and public.is_admin());
+  using (user_id = (select auth.uid()) and (select public.is_admin()));
 
 drop policy if exists dispositivos_push_remover on public.dispositivos_push;
 create policy dispositivos_push_remover
   on public.dispositivos_push for delete
   to authenticated
-  using (user_id = auth.uid() and public.is_admin());
+  using (user_id = (select auth.uid()) and (select public.is_admin()));
 
 -- NOTIFICACOES: historico de envios, somente leitura administrativa.
 drop policy if exists notificacoes_admin_leitura on public.notificacoes;
 create policy notificacoes_admin_leitura
   on public.notificacoes for select
   to authenticated
-  using (public.is_admin());
+  using ((select public.is_admin()));
 
 -- ---------------------------------------------------------------------
 -- EXECUCAO DE FUNCOES

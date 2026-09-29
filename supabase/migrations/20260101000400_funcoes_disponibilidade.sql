@@ -34,6 +34,11 @@ as $$
     when 'NAO_AUTORIZADO'       then 'Você não tem permissão para executar esta ação.'
     when 'CONFIG_AUSENTE'       then 'A barbearia ainda não finalizou a configuração da agenda.'
     when 'PERIODO_INVALIDO'     then 'Período inválido.'
+    when 'STATUS_INVALIDO'      then 'Status inválido.'
+    when 'AGENDAMENTO_NAO_ENCONTRADO' then 'Agendamento não encontrado.'
+    when 'ATENDIMENTO_NAO_COMECOU' then 'Só dá para registrar o atendimento depois do horário marcado.'
+    when 'MUITAS_TENTATIVAS'    then 'Muitos agendamentos em pouco tempo. Tente novamente em alguns minutos.'
+    when 'DADOS_INVALIDOS'      then 'Não foi possível processar o pedido. Atualize a página e tente novamente.'
     else 'Não foi possível concluir a operação. Tente novamente.'
   end;
 $$;

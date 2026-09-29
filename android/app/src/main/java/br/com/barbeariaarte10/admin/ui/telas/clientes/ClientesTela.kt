@@ -184,7 +184,18 @@ private fun CartaoCliente(cliente: ClienteResumo) {
                         color = TextoSuave,
                     )
                 }
-            } else if (cliente.ultimaVisita != null) {
+            }
+
+            if (cliente.faltas > 0) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (cliente.faltas == 1) "1 falta" else "${cliente.faltas} faltas",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextoFraco,
+                )
+            }
+
+            if (cliente.proximoHorario == null && cliente.ultimaVisita != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Última visita: ${Formato.carimbo(cliente.ultimaVisita)}",

@@ -350,6 +350,13 @@ private fun LinhaDaAgenda(item: ItemAgenda, aoTocar: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             color = TextoSuave,
                         )
+                        if (item.foraExpediente) {
+                            Text(
+                                "Fora do expediente atual",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Erro,
+                            )
+                        }
                     }
                     item.ehBloqueio -> {
                         Text(

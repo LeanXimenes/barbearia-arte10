@@ -52,6 +52,8 @@ import br.com.barbeariaarte10.admin.ui.tema.Ouro
 import br.com.barbeariaarte10.admin.ui.tema.Sucesso
 import br.com.barbeariaarte10.admin.ui.tema.TextoFraco
 import br.com.barbeariaarte10.admin.ui.tema.TextoSuave
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 
 /**
@@ -176,7 +178,12 @@ private fun DetalheAgendamento(
             Spacer(Modifier.height(10.dp))
         }
 
-        if (item.status == "agendado") {
+        // O desfecho só existe depois que o horário começou (o banco também exige).
+        val jaComecou = item.inicioEm
+            ?.let { runCatching { Instant.parse(it) <= Clock.System.now() }.getOrNull() }
+            ?: false
+
+        if (item.status == "agendado" && jaComecou) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = { aoMarcarStatus("concluido") },
@@ -203,8 +210,13 @@ private fun DetalheAgendamento(
         }
 
         Text(
-            "Este horário pertence ao cliente e permanece registrado. " +
-                "Marcar o desfecho não libera o horário na agenda.",
+            if (jaComecou) {
+                "Este horário pertence ao cliente e permanece registrado. " +
+                    "Marcar o desfecho não libera o horário na agenda."
+            } else {
+                "Este horário pertence ao cliente e permanece registrado. " +
+                    "Depois do horário você poderá marcar se ele foi atendido ou faltou."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = TextoFraco,
         )

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assinarAgenda, carregarConfig, carregarFuncionamento, carregarServicos } from '../servicos/api'
+import { assinarConteudo, carregarConfig, carregarFuncionamento, carregarServicos } from '../servicos/api'
 import type { ConfigBarbearia, HorarioFuncionamento, Servico } from '../lib/tipos'
 import { supabaseConfigurado } from '../lib/supabase'
 
@@ -64,7 +64,7 @@ export function useDadosDaBarbearia() {
   // Realtime: mudanças feitas pelo aplicativo do proprietário chegam aqui.
   useEffect(() => {
     if (!supabaseConfigurado) return
-    return assinarAgenda(() => {
+    return assinarConteudo(() => {
       void carregar(true)
     })
   }, [carregar])

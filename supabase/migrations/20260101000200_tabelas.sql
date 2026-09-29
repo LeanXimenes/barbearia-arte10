@@ -23,13 +23,16 @@ create table if not exists public.config_barbearia (
   antecedencia_maxima_dias    integer     not null default 60,
   -- Quantos agendamentos futuros um mesmo telefone pode ter em aberto.
   max_agendamentos_futuros    integer     not null default 3,
+  -- Freio contra robôs: máximo de reservas pelo site em qualquer janela de 10 minutos.
+  limite_agendamentos_10min   integer     not null default 20,
   updated_at                  timestamptz not null default now(),
 
   constraint config_barbearia_unica         check (id),
   constraint config_granularidade_valida    check (granularidade_minutos between 5 and 60),
   constraint config_antecedencia_min_valida check (antecedencia_minima_minutos between 0 and 1440),
   constraint config_antecedencia_max_valida check (antecedencia_maxima_dias between 1 and 180),
-  constraint config_max_futuros_valido      check (max_agendamentos_futuros between 1 and 20)
+  constraint config_max_futuros_valido      check (max_agendamentos_futuros between 1 and 20),
+  constraint config_limite_10min_valido     check (limite_agendamentos_10min between 1 and 500)
 );
 
 drop trigger if exists trg_config_barbearia_updated_at on public.config_barbearia;
@@ -164,6 +167,9 @@ create table if not exists public.agendamentos (
   -- "Fotografia" do servico no momento da reserva: preserva o historico
   -- mesmo que o servico seja renomeado, tenha preco alterado ou desativado.
   servico_nome    text                      not null,
+  -- "Fotografia" do nome do cliente: o histórico não muda se o cadastro
+  -- (telefone) for usado depois com outro nome.
+  cliente_nome    text                      not null,
   servico_preco   numeric(10, 2)            not null,
   servico_duracao integer                   not null,
   observacoes     text,
@@ -175,6 +181,8 @@ create table if not exists public.agendamentos (
   constraint agendamentos_periodo_valido check (fim_em > inicio_em),
   constraint agendamentos_horario_valido check (horario_fim > horario_inicio),
   constraint agendamentos_duracao_valida check (servico_duracao between 5 and 480),
+  constraint agendamentos_observacoes_tam check (observacoes is null or char_length(observacoes) <= 1000),
+  constraint agendamentos_chave_tam      check (idempotency_key is null or char_length(idempotency_key) <= 100),
 
   -- >>> TRAVA DE CONCORRENCIA <<<
   -- O banco recusa qualquer agendamento que se sobreponha a outro,
@@ -190,6 +198,7 @@ create index if not exists agendamentos_data_idx      on public.agendamentos (da
 create index if not exists agendamentos_inicio_em_idx on public.agendamentos (inicio_em);
 create index if not exists agendamentos_cliente_idx   on public.agendamentos (cliente_id, inicio_em desc);
 create index if not exists agendamentos_servico_idx   on public.agendamentos (servico_id);
+create index if not exists agendamentos_criacao_idx    on public.agendamentos (created_at);
 
 drop trigger if exists trg_agendamentos_updated_at on public.agendamentos;
 create trigger trg_agendamentos_updated_at
@@ -254,12 +263,17 @@ create table if not exists public.notificacoes (
   corpo          text        not null,
   dados          jsonb       not null default '{}'::jsonb,
   status         text        not null default 'pendente',
+  -- tentativas: quantas vezes a Edge Function assumiu o envio.
+  -- disparos: quantas vezes o banco chamou a Edge Function (pg_net).
   tentativas     integer     not null default 0,
+  disparos       integer     not null default 0,
+  request_id     bigint,
+  reservada_em   timestamptz,
   erro           text,
   created_at     timestamptz not null default now(),
   enviada_em     timestamptz,
 
-  constraint notificacoes_status_valido check (status in ('pendente', 'enviada', 'falhou'))
+  constraint notificacoes_status_valido check (status in ('pendente', 'enviando', 'enviada', 'falhou'))
 );
 
 create index if not exists notificacoes_pendentes_idx

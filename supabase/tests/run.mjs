@@ -19,6 +19,7 @@ import {
   comoAnonimo,
   comoAdmin,
   comoUsuarioComum,
+  comoServico,
   grupo,
   teste,
   igual,
@@ -50,18 +51,24 @@ async function hojeLocal() {
   return { data: iso(r.d), hora: String(r.t) }
 }
 
-/** Proximo dia util (segunda a sexta) a pelo menos `minDias` de hoje. */
-async function proximoDiaUtil(minDias = 1) {
+/**
+ * Proximo dia de segunda a QUINTA a pelo menos `minDias` de hoje.
+ * (Sexta fecha as 20:00 no seed; os asserts supoem fechamento as 19:00.)
+ */
+async function proximoDiaUtil(n = 1) {
+  // O n-esimo dia de segunda a quinta depois de hoje: DIA, DIA2, DIA3 e DIA4
+  // sao sempre dias DIFERENTES, qualquer que seja o dia em que a suite roda.
   const r = await uma(
     `select g::date as d
        from generate_series(
-              (now() at time zone 'America/Sao_Paulo')::date + $1::int,
-              (now() at time zone 'America/Sao_Paulo')::date + $1::int + 10,
+              (now() at time zone 'America/Sao_Paulo')::date + 1,
+              (now() at time zone 'America/Sao_Paulo')::date + 30,
               interval '1 day') g
-      where extract(dow from g) between 1 and 5
+      where extract(dow from g) between 1 and 4
       order by g
+      offset $1::int - 1
       limit 1`,
-    [minDias]
+    [n]
   )
   return iso(r.d)
 }
@@ -78,6 +85,29 @@ async function proximoDomingo() {
       limit 1`
   )
   return iso(r.d)
+}
+
+/** Cria direto no banco (como o dono do banco) um atendimento que ja aconteceu. */
+async function criarAgendamentoPassado(nome, telefone, diasAtras = 1, hora = '10:00') {
+  const r = await uma(
+    `with c as (
+       insert into public.clientes (nome, telefone) values ($1, $2)
+       on conflict (telefone) do update set nome = excluded.nome
+       returning id
+     ), s as (select * from public.servicos where nome = 'Corte de cabelo'),
+     d as (select ((now() at time zone 'America/Sao_Paulo')::date - $3::int) as dia)
+     insert into public.agendamentos
+       (cliente_id, cliente_nome, servico_id, data, horario_inicio, horario_fim, inicio_em, fim_em,
+        servico_nome, servico_preco, servico_duracao, origem)
+     select c.id, $1, s.id, d.dia, $4::time, $4::time + interval '35 minutes',
+            (d.dia + $4::time) at time zone 'America/Sao_Paulo',
+            (d.dia + $4::time + interval '35 minutes') at time zone 'America/Sao_Paulo',
+            s.nome, s.preco, s.duracao_minutos, 'balcao'
+       from c, s, d
+     returning id`,
+    [nome, telefone, diasAtras, hora]
+  )
+  return r.id
 }
 
 /** Chama criar_agendamento como o site publico faria (role anon). */
@@ -374,9 +404,9 @@ await teste('a constraint de exclusao recusa sobreposicao mesmo por dentro do ba
     () =>
       db.query(
         `insert into public.agendamentos
-           (cliente_id, servico_id, data, horario_inicio, horario_fim, inicio_em, fim_em,
+           (cliente_id, cliente_nome, servico_id, data, horario_inicio, horario_fim, inicio_em, fim_em,
             servico_nome, servico_preco, servico_duracao)
-         select a.cliente_id, a.servico_id, a.data, a.horario_inicio, a.horario_fim,
+         select a.cliente_id, a.cliente_nome, a.servico_id, a.data, a.horario_inicio, a.horario_fim,
                 a.inicio_em, a.fim_em, a.servico_nome, a.servico_preco, a.servico_duracao
            from public.agendamentos a
           where a.id = $1`,
@@ -681,18 +711,77 @@ await teste('nao existe status que libere o horario', async () => {
   igual(labels.sort(), ['agendado', 'concluido', 'nao_compareceu'], 'status inesperados')
 })
 
-await teste('o proprietario pode marcar como concluido (sem liberar o horario)', async () => {
+await teste('reserva FUTURA nao pode ter o desfecho marcado (nem pela RPC, nem direto)', async () => {
   const res = await comoAdmin(db, ID_DONO, async () =>
     (await uma('select public.atualizar_status_agendamento($1,$2) as res', [
       agendamentoJoao.id,
-      'concluido',
+      'nao_compareceu',
     ])).res
   )
-  verdadeiro(res.ok, `nao conseguiu concluir: ${res.erro}`)
+  falso(res.ok, 'marcou falta numa reserva que ainda nao aconteceu')
+  igual(res.erro, 'ATENDIMENTO_NAO_COMECOU', 'codigo de erro errado')
 
+  // O app nao tem UPDATE direto na tabela (so a RPC)...
+  await lancaErro(
+    () =>
+      comoAdmin(db, ID_DONO, () =>
+        db.query("update public.agendamentos set status = 'concluido' where id = $1", [agendamentoJoao.id])
+      ),
+    'permission denied',
+    'admin conseguiu UPDATE direto em agendamentos'
+  )
+  // ...e nem o dono do banco consegue burlar pelo SQL.
+  await lancaErro(
+    () => db.query("update public.agendamentos set status = 'concluido' where id = $1", [agendamentoJoao.id]),
+    'ATENDIMENTO_NAO_COMECOU',
+    'trigger permitiu mudar status antes do horario'
+  )
+})
+
+await teste('depois do horario, o proprietario registra o desfecho sem liberar nada', async () => {
+  const passado = await criarAgendamentoPassado('Cliente de Ontem', '17911112222')
+  const antes = await uma('select atualizado_em from public.agenda_publica where id = $1', [passado])
+
+  const res = await comoAdmin(db, ID_DONO, async () =>
+    (await uma('select public.atualizar_status_agendamento($1,$2) as res', [passado, 'concluido'])).res
+  )
+  verdadeiro(res.ok, `nao conseguiu concluir: ${res.erro}`)
+  igual(res.agendamento.status, 'concluido', 'status nao gravado')
+
+  const ainda = await uma('select count(*)::int as n from public.agendamentos where id = $1', [passado])
+  igual(ainda.n, 1, 'o registro sumiu')
+
+  // Mudar so o status nao gera evento publico (o periodo e o mesmo).
+  const depois = await uma('select atualizado_em from public.agenda_publica where id = $1', [passado])
+  igual(String(depois.atualizado_em), String(antes.atualizado_em), 'mudanca de status vazou para a agenda publica')
+})
+
+await teste('atualizar_status_agendamento devolve codigos de erro corretos', async () => {
+  const chamar = (id, st) =>
+    comoAdmin(db, ID_DONO, async () =>
+      (await uma('select public.atualizar_status_agendamento($1,$2) as res', [id, st])).res
+    )
+  igual((await chamar(agendamentoJoao.id, 'cancelado')).erro, 'STATUS_INVALIDO', 'status invalido')
+  igual((await chamar(agendamentoJoao.id, null)).erro, 'STATUS_INVALIDO', 'status nulo')
+  igual((await chamar(randomUUID(), 'concluido')).erro, 'AGENDAMENTO_NAO_ENCONTRADO', 'id inexistente')
+})
+
+await teste('nada disso libera o horario de uma reserva', async () => {
   const slots = await horarios(CORTE.id, DIA)
   const s = slots.find((x) => String(x.horario) === '14:00:00')
-  falso(s.disponivel, 'concluir o atendimento liberou o horario')
+  falso(s.disponivel, 'o horario de Joao ficou livre')
+})
+
+await teste('TRUNCATE (inclusive em cascata) nao apaga o historico', async () => {
+  for (const sql of [
+    'truncate public.agendamentos cascade',
+    'truncate public.clientes cascade',
+    'truncate public.servicos cascade',
+  ]) {
+    await lancaErro(() => db.query(sql), 'AGENDAMENTO_IMUTAVEL', `${sql} passou`)
+  }
+  const n = await uma('select count(*)::int as n from public.agendamentos')
+  verdadeiro(n.n > 0, 'historico apagado')
 })
 
 await teste('servico com historico nao pode ser apagado, apenas desativado (item 27)', async () => {
@@ -812,11 +901,16 @@ await teste('visao_geral_periodo conta os dias do calendario', async () => {
   verdadeiro(dia.agendamentos >= 1, 'nao contou os agendamentos do dia')
 })
 
-await teste('visao_geral_periodo nao devolve nada para nao-admin', async () => {
-  const linhas = await comoUsuarioComum(db, ID_INTRUSO, () =>
-    todas('select * from public.visao_geral_periodo($1,$2)', [DIA, DIA4])
+await teste('visao_geral_periodo recusa (com erro) quem nao e admin', async () => {
+  // Erro explicito: uma lista vazia pareceria "agenda sem clientes".
+  await lancaErro(
+    () =>
+      comoUsuarioComum(db, ID_INTRUSO, () =>
+        todas('select * from public.visao_geral_periodo($1,$2)', [DIA, DIA4])
+      ),
+    'NAO_AUTORIZADO',
+    'nao-admin recebeu o calendario'
   )
-  igual(linhas.length, 0, 'vazou calendario para nao-admin')
 })
 
 await teste('registrar_dispositivo guarda o token do proprietario', async () => {
@@ -915,6 +1009,311 @@ await teste('segredos ficam fora do alcance de anon e authenticated', async () =
     'usuario autenticado leu os segredos'
   )
 })
+
+// =====================================================================
+grupo('Correcoes da auditoria: agenda e historico')
+// =====================================================================
+
+const ONTEM = await (async () => {
+  const { data } = await hojeLocal()
+  return iso(new Date(new Date(data + 'T12:00:00Z').getTime() - 86400000))
+})()
+
+await teste('o historico guarda o nome usado na reserva (outro nome no mesmo telefone nao reescreve)', async () => {
+  const tel = '17933334444'
+  const r1 = await agendar({ servicoId: CORTE.id, data: DIA2, horario: '15:00', nome: 'Maria Original', telefone: tel })
+  verdadeiro(r1.ok, `primeira reserva falhou: ${r1.erro}`)
+  const r2 = await agendar({ servicoId: CORTE.id, data: DIA2, horario: '16:30', nome: 'Nome Trocado', telefone: tel })
+  verdadeiro(r2.ok, `segunda reserva falhou: ${r2.erro}`)
+
+  const agenda = await comoAdmin(db, ID_DONO, async () =>
+    (await uma('select public.agenda_do_dia($1) as res', [DIA2])).res
+  )
+  const de15 = agenda.itens.find((i) => i.tipo === 'agendamento' && i.horario_inicio === '15:00')
+  igual(de15.cliente_nome, 'Maria Original', 'o nome da primeira reserva foi reescrito')
+
+  const json = await uma('select public.agendamento_json($1) as j', [r1.agendamento.id])
+  igual(json.j.cliente, 'Maria Original', 'agendamento_json mostra o nome novo')
+})
+
+await teste('chave de idempotencia gigante e recusada sem erro 500', async () => {
+  const res = await agendar({ servicoId: CORTE.id, data: DIA3, horario: '15:00', telefone: '17955556666', chave: 'x'.repeat(101) })
+  falso(res.ok, 'aceitou chave gigante')
+  igual(res.erro, 'DADOS_INVALIDOS', 'codigo de erro errado')
+})
+
+await teste('freio contra robos: limite de reservas por 10 minutos', async () => {
+  await db.query(
+    `update public.config_barbearia set limite_agendamentos_10min =
+       (select count(*) from public.agendamentos
+         where origem = 'site' and created_at > now() - interval '10 minutes') + 1
+     where id`
+  )
+  try {
+    const ok = await agendar({ servicoId: CORTE.id, data: DIA3, horario: '15:00', telefone: '17955550001', nome: 'Dentro do Limite' })
+    verdadeiro(ok.ok, `reserva dentro do limite recusada: ${ok.erro}`)
+    const bloqueada = await agendar({ servicoId: CORTE.id, data: DIA3, horario: '16:00', telefone: '17955550002', nome: 'Robo' })
+    falso(bloqueada.ok, 'o limite nao segurou')
+    igual(bloqueada.erro, 'MUITAS_TENTATIVAS', 'codigo de erro errado')
+  } finally {
+    await db.query('update public.config_barbearia set limite_agendamentos_10min = 500 where id')
+  }
+})
+
+await teste('linha do tempo do dono usa a MESMA grade do site', async () => {
+  const agenda = await comoAdmin(db, ID_DONO, async () =>
+    (await uma('select public.agenda_do_dia($1) as res', [DIA])).res
+  )
+  const livres = agenda.itens.filter((i) => i.tipo === 'livre')
+  verdadeiro(livres.length > 0, 'nenhum horario livre')
+  for (const l of livres) {
+    const minuto = Number(l.horario_inicio.slice(3, 5))
+    verdadeiro(minuto % 15 === 0, `livre fora da grade: ${l.horario_inicio}`)
+  }
+  falso(livres.some((l) => l.horario_inicio === '14:35'), 'livre comecando no fim do corte (14:35)')
+  for (const h of agenda.proximos_livres) {
+    verdadeiro(Number(h.slice(3, 5)) % 15 === 0, `proximo livre fora da grade: ${h}`)
+  }
+})
+
+await teste('nenhum horario livre cruza agendamento, bloqueio ou intervalo', async () => {
+  const agenda = await comoAdmin(db, ID_DONO, async () =>
+    (await uma('select public.agenda_do_dia($1) as res', [DIA])).res
+  )
+  const ocupados = agenda.itens.filter((i) => i.tipo !== 'livre')
+  for (const l of agenda.itens.filter((i) => i.tipo === 'livre')) {
+    for (const o of ocupados) {
+      const cruza = l.horario_inicio < o.horario_fim && l.horario_fim > o.horario_inicio
+      falso(cruza, `livre ${l.horario_inicio}-${l.horario_fim} cruza ${o.tipo} ${o.horario_inicio}-${o.horario_fim}`)
+    }
+  }
+})
+
+await teste('encurtar o expediente NAO esconde cliente ja marcado', async () => {
+  const res = await agendar({ servicoId: CORTE.id, data: DIA4, horario: '18:15', nome: 'Joao Tarde', telefone: '17966667777' })
+  verdadeiro(res.ok, `reserva falhou: ${res.erro}`)
+  const dow = (await uma('select extract(dow from $1::date)::int as d', [DIA4])).d
+
+  await db.query("update public.config_horarios set fecha = '18:00' where dia_semana = $1", [dow])
+  try {
+    const agenda = await comoAdmin(db, ID_DONO, async () =>
+      (await uma('select public.agenda_do_dia($1) as res', [DIA4])).res
+    )
+    const joao = agenda.itens.find((i) => i.tipo === 'agendamento' && i.horario_inicio === '18:15')
+    verdadeiro(joao, 'o cliente das 18:15 sumiu da agenda do dono')
+    verdadeiro(joao.fora_expediente, 'o item nao foi marcado como fora do expediente')
+
+    const calendario = await comoAdmin(db, ID_DONO, () =>
+      todas('select * from public.visao_geral_periodo($1,$1)', [DIA4])
+    )
+    igual(agenda.resumo.agendamentos, calendario[0].agendamentos, 'agenda e calendario discordam')
+  } finally {
+    await db.query("update public.config_horarios set fecha = '19:00' where dia_semana = $1", [dow])
+  }
+})
+
+await teste('criar_bloqueio recusa passado, dia fechado e fora do expediente', async () => {
+  const bloquear = (d, i, f) =>
+    comoAdmin(db, ID_DONO, async () =>
+      (await uma('select public.criar_bloqueio($1,$2,$3,$4) as res', [d, i, f, null])).res
+    )
+  igual((await bloquear(ONTEM, '10:00', '11:00')).erro, 'HORARIO_PASSADO', 'bloqueou o passado')
+  igual((await bloquear(DOMINGO, '10:00', '11:00')).erro, 'DIA_FECHADO', 'bloqueou dia fechado')
+  igual((await bloquear(DIA3, '07:00', '08:00')).erro, 'FORA_EXPEDIENTE', 'bloqueou fora do expediente')
+
+  // Cobrir o intervalo continua permitido (ex.: fechar a tarde inteira).
+  const ok = await bloquear(DIA3, '11:30', '14:00')
+  verdadeiro(ok.ok, `nao deixou bloquear por cima do intervalo: ${ok.erro}`)
+  await comoAdmin(db, ID_DONO, () => uma('select public.remover_bloqueio($1) as r', [ok.bloqueio.id]))
+})
+
+await teste('clientes_resumo: ultima visita so conta atendimento que ja aconteceu', async () => {
+  await criarAgendamentoPassado('Faltoso da Silva', '17977778888', 2, '11:00')
+  const idFalta = (await uma(
+    "select a.id from public.agendamentos a join public.clientes c on c.id = a.cliente_id where c.telefone = '17977778888'"
+  )).id
+  await comoAdmin(db, ID_DONO, () =>
+    uma('select public.atualizar_status_agendamento($1,$2) as r', [idFalta, 'nao_compareceu'])
+  )
+
+  const linhas = await comoAdmin(db, ID_DONO, () => todas('select * from public.clientes_resumo'))
+  const joao = linhas.find((c) => c.telefone === '17999990001')
+  igual(joao.ultima_visita, null, 'reserva futura contou como ultima visita')
+  verdadeiro(joao.proximo_horario, 'proximo horario ausente')
+
+  const faltoso = linhas.find((c) => c.telefone === '17977778888')
+  igual(faltoso.faltas, 1, 'falta nao contada')
+  igual(faltoso.ultima_visita, null, 'falta contou como visita')
+})
+
+await teste('TRUNCATE em bloqueios limpa o espelho publico', async () => {
+  const b = await comoAdmin(db, ID_DONO, async () =>
+    (await uma('select public.criar_bloqueio($1,$2,$3,$4) as res', [DIA3, '17:00', '17:15', 'teste'])).res
+  )
+  verdadeiro(b.ok, `bloqueio falhou: ${b.erro}`)
+  await db.query('truncate public.bloqueios')
+  const n = await uma("select count(*)::int as n from public.agenda_publica where origem = 'bloqueio'")
+  igual(n.n, 0, 'sobrou bloqueio fantasma na agenda publica')
+})
+
+// =====================================================================
+grupo('Push de ponta a ponta no banco (pg_net simulado)')
+// =====================================================================
+
+const dbp = await criarBanco()
+await dbp.exec(`
+  create schema net;
+  create table net.chamadas (id bigserial primary key, url text, body jsonb, headers jsonb);
+  create table net._http_response (id bigint primary key, status_code integer, content text, error_msg text);
+  create function net.http_post(
+    url text, body jsonb default '{}', params jsonb default '{}',
+    headers jsonb default '{}', timeout_milliseconds integer default 5000
+  ) returns bigint language sql as $f$
+    insert into net.chamadas (url, body, headers) values (url, body, headers) returning id
+  $f$;
+`)
+
+const umaP = async (sql, params = []) => (await dbp.query(sql, params)).rows[0]
+const todasP = async (sql, params = []) => (await dbp.query(sql, params)).rows
+const ID_DONO_P = randomUUID()
+const ID_EX = randomUUID()
+await dbp.query('insert into auth.users (id, email) values ($1,$2), ($3,$4)', [ID_DONO_P, 'dono@p.test', ID_EX, 'ex@p.test'])
+await dbp.query("insert into public.administradores (user_id, nome) values ($1,'Dono'), ($2,'Ex-funcionario')", [ID_DONO_P, ID_EX])
+const CORTE_P = (await umaP("select id from public.servicos where nome = 'Corte de cabelo'")).id
+const DIA_P = DIA
+
+function agendarP(horario, telefone) {
+  return comoAnonimo(dbp, async () =>
+    (await umaP('select public.criar_agendamento($1,$2,$3,$4,$5,$6) as res', [
+      CORTE_P, DIA_P, horario, 'Cliente Push', telefone, null,
+    ])).res
+  )
+}
+async function notificacaoDe(agendamentoId) {
+  return umaP('select * from public.notificacoes where agendamento_id = $1', [agendamentoId])
+}
+
+await teste('sem configurar o push, a reserva funciona e o motivo fica registrado', async () => {
+  const r = await agendarP('09:00', '17900000001')
+  verdadeiro(r.ok, `reserva falhou: ${r.erro}`)
+  const n = await notificacaoDe(r.agendamento.id)
+  verdadeiro(String(n.erro).includes('Push não configurado'), `motivo nao registrado: ${n.erro}`)
+  igual((await umaP('select count(*)::int as n from net.chamadas')).n, 0, 'chamou a funcao sem token')
+})
+
+await dbp.query(
+  "insert into private.segredos (chave, valor) values ('edge_notificacoes_url','https://x.test/fn'), ('edge_notificacoes_token','segredo-de-teste')"
+)
+
+let notifId = null
+
+await teste('com o push configurado, a reserva chama a Edge Function com o token', async () => {
+  const r = await agendarP('09:45', '17900000002')
+  verdadeiro(r.ok, `reserva falhou: ${r.erro}`)
+  const n = await notificacaoDe(r.agendamento.id)
+  notifId = n.id
+  igual(n.disparos, 1, 'nao contou o disparo')
+  verdadeiro(n.request_id, 'request_id nao guardado')
+  const chamada = await umaP('select * from net.chamadas where id = $1', [n.request_id])
+  igual(chamada.body.notificacao_id, n.id, 'corpo sem o id da notificacao')
+  igual(chamada.headers.Authorization, 'Bearer segredo-de-teste', 'token nao enviado')
+})
+
+await teste('o reenvio NAO pega notificacao recem-criada (evita push duplicado)', async () => {
+  const antes = (await umaP('select count(*)::int as n from net.chamadas')).n
+  await umaP('select public.reenviar_notificacoes_pendentes(20) as n')
+  igual((await umaP('select count(*)::int as n from net.chamadas')).n, antes, 'reenviou algo recem-criado')
+})
+
+await teste('o reenvio registra o HTTP de erro da ultima chamada e tenta de novo', async () => {
+  const n = await umaP('select * from public.notificacoes where id = $1', [notifId])
+  await dbp.query("insert into net._http_response (id, status_code, content) values ($1, 401, 'Invalid JWT')", [n.request_id])
+  await dbp.query("update public.notificacoes set created_at = now() - interval '2 minutes' where id = $1", [notifId])
+  await umaP('select public.reenviar_notificacoes_pendentes(20) as n')
+  const depois = await umaP('select * from public.notificacoes where id = $1', [notifId])
+  verdadeiro(String(depois.erro).includes('HTTP 401'), `erro nao registrado: ${depois.erro}`)
+  igual(depois.disparos, 2, 'nao disparou de novo')
+})
+
+await teste('a reserva da notificacao pela Edge Function e atomica', async () => {
+  const primeira = await comoServico(dbp, () => todasP('select * from public.reservar_notificacao($1)', [notifId]))
+  igual(primeira.length, 1, 'nao reservou')
+  igual(primeira[0].tentativas, 1, 'tentativa nao contada')
+  const segunda = await comoServico(dbp, () => todasP('select * from public.reservar_notificacao($1)', [notifId]))
+  igual(segunda.length, 0, 'duas chamadas reservaram a mesma notificacao (push duplicado)')
+
+  const antes = (await umaP('select count(*)::int as n from net.chamadas')).n
+  await umaP('select public.reenviar_notificacoes_pendentes(20) as n')
+  igual((await umaP('select count(*)::int as n from net.chamadas')).n, antes, 'reenvio pegou notificacao em envio')
+})
+
+await teste('erro passageiro volta para pendente; envio confirmado vira enviada', async () => {
+  await comoServico(dbp, () => umaP("select public.finalizar_notificacao($1, 'pendente', 'FCM 503') as r", [notifId]))
+  igual((await umaP('select status from public.notificacoes where id = $1', [notifId])).status, 'pendente', 'nao voltou para pendente')
+
+  await comoServico(dbp, () => todasP('select * from public.reservar_notificacao($1)', [notifId]))
+  await comoServico(dbp, () => umaP("select public.finalizar_notificacao($1, 'enviada') as r", [notifId]))
+  const n = await umaP('select * from public.notificacoes where id = $1', [notifId])
+  igual(n.status, 'enviada', 'nao marcou enviada')
+  verdadeiro(n.enviada_em, 'sem data de envio')
+})
+
+await teste('depois do maximo de tentativas a notificacao para de ser reenviada', async () => {
+  const r = await agendarP('10:30', '17900000003')
+  const n = await notificacaoDe(r.agendamento.id)
+  await dbp.query('update public.notificacoes set tentativas = public.push_max_tentativas() - 1 where id = $1', [n.id])
+  await comoServico(dbp, () => todasP('select * from public.reservar_notificacao($1)', [n.id]))
+  await comoServico(dbp, () => umaP("select public.finalizar_notificacao($1, 'pendente', 'FCM fora') as r", [n.id]))
+  igual((await umaP('select status from public.notificacoes where id = $1', [n.id])).status, 'falhou', 'continuou pendente para sempre')
+})
+
+await teste('Edge Function que nunca responde: desiste depois de muitos disparos', async () => {
+  const r = await agendarP('11:15', '17900000004')
+  const n = await notificacaoDe(r.agendamento.id)
+  await dbp.query("update public.notificacoes set disparos = 30, created_at = now() - interval '2 minutes' where id = $1", [n.id])
+  await umaP('select public.reenviar_notificacoes_pendentes(20) as n')
+  const depois = await umaP('select * from public.notificacoes where id = $1', [n.id])
+  igual(depois.status, 'falhou', 'continuou disparando para sempre')
+})
+
+await teste('push so vai para aparelhos de administradores ATIVOS', async () => {
+  for (const [uid, token] of [[ID_DONO_P, 'token-do-dono-0001'], [ID_EX, 'token-do-ex-0002']]) {
+    await comoAdmin(dbp, uid, () => umaP('select public.registrar_dispositivo($1,$2) as r', [token, 'teste']))
+  }
+  igual((await comoServico(dbp, () => todasP('select * from public.destinos_push()'))).length, 2, 'destinos iniciais')
+
+  await dbp.query('update public.administradores set ativo = false where user_id = $1', [ID_EX])
+  const destinos = await comoServico(dbp, () => todasP('select * from public.destinos_push()'))
+  igual(destinos.map((d) => d.token), ['token-do-dono-0001'], 'aparelho do ex-funcionario continua recebendo')
+  const dev = await umaP("select ativo from public.dispositivos_push where token = 'token-do-ex-0002'")
+  falso(dev.ativo, 'aparelho do administrador desativado nao foi desligado')
+})
+
+await teste('funcoes internas do push nao sao chamaveis pelo site nem pelo app', async () => {
+  for (const sql of [
+    'select * from public.reservar_notificacao(gen_random_uuid())',
+    'select * from public.destinos_push()',
+    'select public.reenviar_notificacoes_pendentes(1)',
+  ]) {
+    await lancaErro(() => comoAnonimo(dbp, () => todasP(sql)), 'permission denied', `anon executou: ${sql}`)
+    await lancaErro(() => comoAdmin(dbp, ID_DONO_P, () => todasP(sql)), 'permission denied', `app executou: ${sql}`)
+  }
+})
+
+await teste('se o pg_net falhar, a reserva do cliente continua valendo', async () => {
+  await dbp.exec(`
+    create or replace function net.http_post(
+      url text, body jsonb default '{}', params jsonb default '{}',
+      headers jsonb default '{}', timeout_milliseconds integer default 5000
+    ) returns bigint language plpgsql as $f$ begin raise exception 'pg_net fora do ar'; end $f$;
+  `)
+  const r = await agendarP('14:00', '17900000005')
+  verdadeiro(r.ok, `a falha do push derrubou a reserva: ${r.erro}`)
+  const n = await notificacaoDe(r.agendamento.id)
+  verdadeiro(String(n.erro).includes('pg_net fora do ar'), `falha nao registrada: ${n.erro}`)
+})
+
+await dbp.close()
 
 // =====================================================================
 const falhas = relatorio()

@@ -95,6 +95,8 @@ data class ItemAgenda(
     val motivo: String? = null,
     @SerialName("criado_em") val criadoEm: String? = null,
     val passado: Boolean = false,
+    /** Marcado antes de o dono mudar o expediente, ou em dia fechado. */
+    @SerialName("fora_expediente") val foraExpediente: Boolean = false,
 ) {
     val ehAgendamento: Boolean get() = tipo == "agendamento"
     val ehBloqueio: Boolean get() = tipo == "bloqueio"
@@ -145,6 +147,7 @@ data class ClienteResumo(
     val telefone: String,
     @SerialName("created_at") val criadoEm: String? = null,
     @SerialName("total_agendamentos") val totalAgendamentos: Int = 0,
+    val faltas: Int = 0,
     @SerialName("ultima_visita") val ultimaVisita: String? = null,
     @SerialName("proximo_horario") val proximoHorario: String? = null,
 )

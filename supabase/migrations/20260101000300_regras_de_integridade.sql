@@ -9,8 +9,9 @@
 -- apenas na interface: mesmo um acesso direto a API com token de
 -- administrador e recusado.
 --
--- O que ainda pode mudar: "status" (para concluido / nao_compareceu) e
--- "observacoes". Nenhum desses libera o horario.
+-- O que ainda pode mudar: "status" (desfecho do atendimento, e só
+-- depois que o horário começou) e "observacoes". Nenhum dos dois libera
+-- o horário.
 -- ---------------------------------------------------------------------
 create or replace function public.tg_agendamento_imutavel()
 returns trigger
@@ -25,6 +26,7 @@ begin
 
   if new.id is distinct from old.id
      or new.cliente_id      is distinct from old.cliente_id
+     or new.cliente_nome    is distinct from old.cliente_nome
      or new.servico_id      is distinct from old.servico_id
      or new.data            is distinct from old.data
      or new.horario_inicio  is distinct from old.horario_inicio
@@ -43,6 +45,15 @@ begin
             errcode = 'check_violation';
   end if;
 
+  -- O desfecho (atendido / não compareceu) só existe depois que o horário
+  -- começou. Isso impede, por exemplo, marcar reservas futuras como falta
+  -- para contornar o limite de reservas por telefone.
+  if new.status is distinct from old.status and old.inicio_em > now() then
+    raise exception 'ATENDIMENTO_NAO_COMECOU'
+      using detail  = 'O status so pode ser alterado depois do horario marcado.',
+            errcode = 'check_violation';
+  end if;
+
   return new;
 end;
 $$;
@@ -56,6 +67,28 @@ drop trigger if exists trg_agendamentos_sem_alteracao on public.agendamentos;
 create trigger trg_agendamentos_sem_alteracao
   before update on public.agendamentos
   for each row execute function public.tg_agendamento_imutavel();
+
+-- ---------------------------------------------------------------------
+-- TRUNCATE não dispara gatilhos de linha. Sem esta trava, um
+-- "truncate clientes cascade" (ou servicos cascade) apagaria todo o
+-- histórico em silêncio. O gatilho por instrução também dispara quando a
+-- tabela é atingida pela cascata.
+-- ---------------------------------------------------------------------
+create or replace function public.tg_agendamento_sem_truncate()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'AGENDAMENTO_IMUTAVEL'
+    using detail  = 'O historico de agendamentos nao pode ser apagado (TRUNCATE).',
+          errcode = 'check_violation';
+end;
+$$;
+
+drop trigger if exists trg_agendamentos_sem_truncate on public.agendamentos;
+create trigger trg_agendamentos_sem_truncate
+  before truncate on public.agendamentos
+  for each statement execute function public.tg_agendamento_sem_truncate();
 
 -- ---------------------------------------------------------------------
 -- Servicos nunca sao apagados quando ja foram usados: a FK com
@@ -118,6 +151,21 @@ begin
     return old;
   end if;
 
+  if tg_op = 'UPDATE' then
+    -- Mudou só status/observações/motivo: o período ocupado é o mesmo, então
+    -- não há por que gerar um evento público (e revelar que o registro mudou).
+    if new.id = old.id
+       and new.data = old.data
+       and new.inicio_em = old.inicio_em
+       and new.fim_em = old.fim_em then
+      return new;
+    end if;
+
+    if new.id <> old.id then
+      delete from public.agenda_publica where id = old.id;
+    end if;
+  end if;
+
   insert into public.agenda_publica
     (id, origem, data, horario_inicio, horario_fim, inicio_em, fim_em, atualizado_em)
   values
@@ -143,6 +191,24 @@ drop trigger if exists trg_bloqueios_agenda_publica on public.bloqueios;
 create trigger trg_bloqueios_agenda_publica
   after insert or update or delete on public.bloqueios
   for each row execute function public.tg_sincronizar_agenda_publica('bloqueio');
+
+-- Um TRUNCATE em bloqueios não passa pelo gatilho de linha: limpa o espelho.
+create or replace function public.tg_bloqueios_truncate_agenda_publica()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  delete from public.agenda_publica where origem = 'bloqueio';
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_bloqueios_truncate_agenda_publica on public.bloqueios;
+create trigger trg_bloqueios_truncate_agenda_publica
+  after truncate on public.bloqueios
+  for each statement execute function public.tg_bloqueios_truncate_agenda_publica();
 
 -- ---------------------------------------------------------------------
 -- Quem e administrador?

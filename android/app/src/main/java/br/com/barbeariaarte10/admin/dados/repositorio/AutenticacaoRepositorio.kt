@@ -9,6 +9,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -49,8 +50,9 @@ class AutenticacaoRepositorio {
         }
 
         val login = executar(
-            mensagemPadrao = "A conta configurada no app não foi aceita. " +
-                "Confira BARBEIRO_EMAIL e BARBEIRO_SENHA e se o usuário existe no Supabase.",
+            mensagemPadrao = "O Supabase recusou a conexão do app. Confira no local.properties " +
+                "SUPABASE_URL, SUPABASE_ANON_KEY, BARBEIRO_EMAIL e BARBEIRO_SENHA, e se o usuário " +
+                "existe em Authentication > Users.",
         ) {
             supabase.auth.signInWith(Email) {
                 email = BuildConfig.BARBEIRO_EMAIL
@@ -77,6 +79,25 @@ class AutenticacaoRepositorio {
                 }
             }
         }
+    }
+
+    /**
+     * Confere no servidor se a conta ainda está liberada (ex.: o dono
+     * desativou o acesso depois que o app já estava conectado).
+     */
+    suspend fun verificarAcesso(): Resultado<Boolean> = executar {
+        supabase.postgrest.rpc("is_admin").decodeAs<Boolean>()
+    }
+
+    /**
+     * Garante uma sessão para trabalhos em segundo plano (ex.: o Firebase
+     * trocou o token com o app fechado). Espera a sessão salva carregar e,
+     * se não houver, conecta com a conta do app.
+     */
+    suspend fun garantirSessao(): Boolean {
+        runCatching { supabase.auth.awaitInitialization() }
+        if (supabase.auth.currentSessionOrNull() != null) return true
+        return conectar() is Resultado.Sucesso
     }
 
     /** A policy "administradores_proprio" só devolve a própria linha. */
