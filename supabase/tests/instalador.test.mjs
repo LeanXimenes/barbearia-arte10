@@ -72,6 +72,47 @@ test('limpar_testes.sql apaga só os agendamentos "TESTE" e religa a proteção'
   await db.close()
 })
 
+test('dados_da_barbearia.sql corrige um banco instalado com os dados de exemplo', async () => {
+  const db = await PGlite.create()
+  await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
+  await db.exec(readFileSync(INSTALADOR, 'utf8'))
+
+  // Situação real: instalado antes de o seed ter os dados verdadeiros.
+  await db.exec(`
+    update public.config_barbearia set telefone_whatsapp = null, instagram = null,
+      endereco = null, cidade = null, uf = null where id;
+    update public.config_horarios set aberto = false, abre = null, fecha = null,
+      intervalo_inicio = null, intervalo_fim = null where dia_semana = 0;
+    update public.config_horarios set aberto = true, abre = '09:00', fecha = '19:00',
+      intervalo_inicio = '12:00', intervalo_fim = '13:30' where dia_semana between 1 and 5;
+  `)
+
+  const corrigir = readFileSync(join(aqui, '..', 'dados_da_barbearia.sql'), 'utf8')
+  await db.exec(corrigir)
+  await db.exec(corrigir) // pode rodar de novo
+
+  const cfg = (await db.query('select * from public.config_barbearia')).rows[0]
+  assert.equal(cfg.endereco, 'Rua Joaquim Iglesias, 889')
+  assert.equal(cfg.cidade, 'Santa Albertina')
+  assert.equal(cfg.telefone_whatsapp, '17997313480')
+  assert.equal(cfg.instagram, 'aquiles.hiroshi')
+
+  const horas = (
+    await db.query(
+      `select dia_semana, aberto, to_char(abre,'HH24:MI') as abre, to_char(fecha,'HH24:MI') as fecha,
+              intervalo_inicio from public.config_horarios order by dia_semana`
+    )
+  ).rows
+  for (const h of horas) {
+    const fimDeSemana = h.dia_semana === 0 || h.dia_semana === 6
+    assert.equal(h.aberto, true, `dia ${h.dia_semana} fechado`)
+    assert.equal(h.abre, fimDeSemana ? '09:00' : '08:00', `abertura do dia ${h.dia_semana}`)
+    assert.equal(h.fecha, fimDeSemana ? '23:00' : '12:30', `fechamento do dia ${h.dia_semana}`)
+    assert.equal(h.intervalo_inicio, null, `intervalo no dia ${h.dia_semana}`)
+  }
+  await db.close()
+})
+
 test('ativar_push.sql recusa rodar com os valores de exemplo', async () => {
   const db = await PGlite.create()
   await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
