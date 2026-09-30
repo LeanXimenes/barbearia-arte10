@@ -5,6 +5,7 @@ import br.com.barbeariaarte10.admin.core.MSG_NAO_SALVO_SEM_CONEXAO
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.core.Supabase
 import br.com.barbeariaarte10.admin.core.executar
+import br.com.barbeariaarte10.admin.dados.modelo.AssinaturaResumo
 import br.com.barbeariaarte10.admin.dados.modelo.ClienteResumo
 import br.com.barbeariaarte10.admin.dados.modelo.ConfigBarbearia
 import br.com.barbeariaarte10.admin.dados.modelo.HorarioFuncionamento
@@ -14,6 +15,8 @@ import br.com.barbeariaarte10.admin.dados.modelo.ServicoEdicao
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -54,6 +57,7 @@ class CatalogoRepositorio {
                     set("duracao_minutos", servico.duracaoMinutos)
                     set("ativo", servico.ativo)
                     set("ordem", servico.ordem)
+                    set("usa_plano", servico.usaPlano)
                 },
             ) {
                 filter { eq("id", id) }
@@ -69,6 +73,45 @@ class CatalogoRepositorio {
             supabase.from("servicos").update({ set("ativo", ativo) }) {
                 filter { eq("id", id) }
             }
+        }
+
+    /** Grava a nova ordem (a ordem da lista é a ordem no site). */
+    suspend fun reordenarServicos(ids: List<String>): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc(
+                    "reordenar_servicos",
+                    buildJsonObject { put("p_ids", JsonArray(ids.map { JsonPrimitive(it) })) },
+                )
+                .decodeAs<RespostaSimples>()
+        }
+
+    // ------------------------------------------------ Clube Arte 10
+
+    /** Pedidos e planos dos clientes, dos mais novos para os mais antigos. */
+    suspend fun assinaturas(): Resultado<List<AssinaturaResumo>> = executar {
+        supabase.from("assinaturas_resumo")
+            .select {
+                order("solicitada_em", Order.DESCENDING)
+                limit(200)
+            }
+            .decodeList<AssinaturaResumo>()
+    }
+
+    /** Pagamento confirmado: o plano começa a valer agora. */
+    suspend fun ativarAssinatura(id: String): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc("ativar_assinatura", buildJsonObject { put("p_id", id) })
+                .decodeAs<RespostaSimples>()
+        }
+
+    /** Recusa um pedido ou cancela um plano ativo. */
+    suspend fun encerrarAssinatura(id: String): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc("encerrar_assinatura", buildJsonObject { put("p_id", id) })
+                .decodeAs<RespostaSimples>()
         }
 
     // ----------------------------------------------- funcionamento

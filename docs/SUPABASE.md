@@ -167,6 +167,24 @@ o nome começando por **TESTE** e, **antes de divulgar**, rode
 
 ---
 
+## 8. Atualizar um banco que já está no ar
+
+Quando o sistema ganha coisa nova (como o **Clube Arte 10**, o cancelamento
+pelo app e a ordem dos serviços), rode de novo o `supabase/instalar_tudo.sql`
+inteiro no SQL Editor. Ele só acrescenta o que falta: **não apaga
+agendamentos, clientes nem os seus dados**.
+
+### Clube Arte 10 (planos e promoções)
+
+- Os textos e preços ficam nas tabelas `planos` e `promocoes`
+  (**Table Editor**). Para esconder um item, desmarque `ativo`.
+- O serviço que desconta do plano é o que tem `usa_plano` ligado
+  (dá para mudar no app, em Serviços → editar).
+- O cliente pede o plano no site → o dono recebe um push → confirma o
+  pagamento na aba **Clube** do app. A partir daí, cada corte agendado com
+  aquele telefone desconta 1 do plano, e o cliente vê quantos restam.
+- Se o dono cancelar um horário que usou o plano, o corte volta.
+
 ## Mapa do banco
 
 ### Tabelas

@@ -8,6 +8,8 @@ export interface Servico {
   duracao_minutos: number
   ativo: boolean
   ordem: number
+  /** Desconta um corte do plano do Clube quando agendado. */
+  usa_plano: boolean
 }
 
 export interface HorarioDoDia {
@@ -64,7 +66,54 @@ export interface AgendamentoConfirmado {
   fim_em: string
   status: string
   created_at: string
+  /** Presente quando este agendamento usou um corte do plano do cliente. */
+  plano?: UsoDoPlano | null
 }
+
+export interface UsoDoPlano {
+  nome: string
+  numero: number
+  total: number
+  restantes: number
+  expira_em: string
+}
+
+export interface Plano {
+  id: string
+  nome: string
+  chamada: string | null
+  preco: number
+  preco_referencia: number | null
+  cortes: number
+  validade_dias: number
+  beneficios: string[]
+  destaque: boolean
+}
+
+export interface Promocao {
+  id: string
+  titulo: string
+  chamada: string | null
+  descricao: string | null
+  itens: string[]
+  observacao: string | null
+}
+
+export interface Assinatura {
+  id: string
+  plano: string
+  status: 'solicitada' | 'ativa' | 'encerrada' | 'recusada' | 'cancelada'
+  preco: number
+  cortes_total: number
+  cortes_usados: number
+  restantes: number
+  solicitada_em: string
+  expira_em: string | null
+}
+
+export type RespostaPlano =
+  | { ok: true; assinatura: Assinatura; barbearia: DadosBarbearia }
+  | { ok: false; erro: string; mensagem: string; assinatura?: Assinatura }
 
 export interface DadosBarbearia {
   nome: string

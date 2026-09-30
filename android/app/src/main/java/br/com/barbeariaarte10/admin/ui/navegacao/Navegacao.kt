@@ -9,11 +9,13 @@ import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -41,6 +43,7 @@ import br.com.barbeariaarte10.admin.notificacoes.sincronizarTokenPush
 import br.com.barbeariaarte10.admin.ui.componentes.FaixaOffline
 import br.com.barbeariaarte10.admin.ui.telas.agenda.AgendaTela
 import br.com.barbeariaarte10.admin.ui.telas.clientes.ClientesTela
+import br.com.barbeariaarte10.admin.ui.telas.clube.ClubeTela
 import br.com.barbeariaarte10.admin.ui.telas.configuracoes.ConfiguracoesTela
 import br.com.barbeariaarte10.admin.ui.telas.historico.HistoricoTela
 import br.com.barbeariaarte10.admin.ui.telas.inicio.InicioTela
@@ -57,6 +60,7 @@ sealed class Rota(val caminho: String) {
     data object Agenda : Rota("agenda")
     data object Clientes : Rota("clientes")
     data object Servicos : Rota("servicos")
+    data object Clube : Rota("clube")
     data object Configuracoes : Rota("configuracoes")
     data object Historico : Rota("historico")
 }
@@ -73,6 +77,7 @@ private val ABAS = listOf(
     Aba(Rota.Agenda, "Agenda", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
     Aba(Rota.Clientes, "Clientes", Icons.Filled.People, Icons.Outlined.People),
     Aba(Rota.Servicos, "Serviços", Icons.Filled.ContentCut, Icons.Outlined.ContentCut),
+    Aba(Rota.Clube, "Clube", Icons.Filled.WorkspacePremium, Icons.Outlined.WorkspacePremium),
     Aba(Rota.Configuracoes, "Ajustes", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
@@ -145,7 +150,9 @@ private fun AppConectado(dataPedida: String?, aoConsumirData: () -> Unit) {
                                 contentDescription = aba.titulo,
                             )
                         },
-                        label = { Text(aba.titulo, style = MaterialTheme.typography.bodySmall) },
+                        label = {
+                            Text(aba.titulo, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Ouro,
                             selectedTextColor = Ouro,
@@ -185,6 +192,9 @@ private fun AppConectado(dataPedida: String?, aoConsumirData: () -> Unit) {
                 }
                 composable(Rota.Servicos.caminho) {
                     ServicosTela(online = online)
+                }
+                composable(Rota.Clube.caminho) {
+                    ClubeTela(online = online)
                 }
                 composable(Rota.Configuracoes.caminho) {
                     ConfiguracoesTela(

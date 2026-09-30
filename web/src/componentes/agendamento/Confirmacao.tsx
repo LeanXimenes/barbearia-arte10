@@ -1,6 +1,7 @@
 import type { AgendamentoConfirmado, DadosBarbearia } from '../../lib/tipos'
 import {
   dataPorExtenso,
+  diaMesDoInstante,
   duracao,
   linkMapa,
   linkWhatsapp,
@@ -25,7 +26,7 @@ export function Confirmacao({ agendamento, barbearia }: Props) {
   const whats = linkWhatsapp(
     barbearia.telefone_whatsapp,
     `Olá! Sou ${agendamento.cliente}, confirmei o horário de ${agendamento.horario_inicio} ` +
-      `para ${agendamento.servico} (código ${agendamento.codigo}).`
+      `para ${agendamento.servico} (código ${agendamento.codigo}).`,
   )
 
   const endereco = [barbearia.endereco, barbearia.cidade, barbearia.uf].filter(Boolean).join(' · ')
@@ -99,6 +100,23 @@ export function Confirmacao({ agendamento, barbearia }: Props) {
         )}
       </div>
 
+      {agendamento.plano && (
+        <div className="aviso-plano aviso-plano--confirmado" role="status">
+          <strong>
+            {agendamento.plano.nome}: {agendamento.plano.numero}º corte de {agendamento.plano.total}
+          </strong>
+          {agendamento.plano.restantes > 0 ? (
+            <span>
+              Ainda restam {agendamento.plano.restantes}{' '}
+              {agendamento.plano.restantes === 1 ? 'corte' : 'cortes'} no seu plano, válido até{' '}
+              {diaMesDoInstante(agendamento.plano.expira_em)}.
+            </span>
+          ) : (
+            <span>Esse foi o último corte do seu plano. Renove na aba Clube!</span>
+          )}
+        </div>
+      )}
+
       <p className="campo__dica" style={{ marginTop: 16 }}>
         Chegue com alguns minutos de antecedência. Se precisar remarcar, fale com a barbearia.
       </p>
@@ -106,12 +124,22 @@ export function Confirmacao({ agendamento, barbearia }: Props) {
       {(mapa || whats) && (
         <div className="hero__botoes" style={{ marginTop: 18 }}>
           {mapa && (
-            <a href={mapa} target="_blank" rel="noopener noreferrer" className="botao botao--contorno">
+            <a
+              href={mapa}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="botao botao--contorno"
+            >
               Como chegar
             </a>
           )}
           {whats && (
-            <a href={whats} target="_blank" rel="noopener noreferrer" className="botao botao--contorno">
+            <a
+              href={whats}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="botao botao--contorno"
+            >
               <IconeWhatsapp tamanho={16} />
               Falar no WhatsApp
             </a>

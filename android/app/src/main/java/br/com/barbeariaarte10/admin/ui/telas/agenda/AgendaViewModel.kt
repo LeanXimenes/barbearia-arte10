@@ -25,6 +25,8 @@ data class EstadoAgenda(
     val processando: Boolean = false,
     val aviso: String? = null,
     val itemSelecionado: ItemAgenda? = null,
+    /** WhatsApp a abrir depois de um cancelamento (para avisar o cliente). */
+    val linkAviso: String? = null,
 )
 
 class AgendaViewModel : ViewModel() {
@@ -183,4 +185,51 @@ class AgendaViewModel : ViewModel() {
             }
         }
     }
+
+    /**
+     * Cancela o horário do cliente. Só depois que o banco confirmar é que
+     * o WhatsApp abre para avisar o cliente (nunca avisa algo que não aconteceu).
+     */
+    fun cancelar(item: ItemAgenda, motivo: String?, avisarCliente: Boolean) {
+        val id = item.id ?: return
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+
+        viewModelScope.launch {
+            when (val resposta = Grafo.agenda.cancelar(id, motivo)) {
+                is Resultado.Sucesso -> {
+                    val ok = resposta.dado.ok
+                    val link = if (ok && avisarCliente) {
+                        val porque = motivo?.trim()?.takeIf { it.isNotEmpty() }?.let { " Motivo: $it." }.orEmpty()
+                        Formato.linkWhatsapp(
+                            item.clienteTelefone,
+                            "Olá, ${item.clienteNome.orEmpty()}! Aqui é da Barbearia Arte 10. " +
+                                "Infelizmente precisamos cancelar o seu horário de " +
+                                "${Formato.dataCurta(_estado.value.data)} às ${item.horarioInicio}.$porque " +
+                                "Você pode marcar outro horário pelo app. Desculpe o transtorno!",
+                        )
+                    } else {
+                        null
+                    }
+                    _estado.update {
+                        it.copy(
+                            processando = false,
+                            itemSelecionado = if (ok) null else it.itemSelecionado,
+                            aviso = if (ok) "Horário cancelado. Ele já está livre no site." else resposta.dado.mensagem,
+                            linkAviso = link,
+                        )
+                    }
+                    if (ok) {
+                        carregar(silencioso = true)
+                        carregarCalendario()
+                    }
+                }
+                is Resultado.Falha -> _estado.update {
+                    it.copy(processando = false, aviso = resposta.mensagem)
+                }
+            }
+        }
+    }
+
+    fun limparLinkAviso() = _estado.update { it.copy(linkAviso = null) }
 }

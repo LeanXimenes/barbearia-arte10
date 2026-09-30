@@ -112,6 +112,15 @@ object Formato {
         }.getOrDefault(iso)
     }
 
+    /** "29/10" de um instante do banco, no fuso da barbearia. */
+    fun diaMes(iso: String?): String {
+        if (iso.isNullOrBlank()) return ""
+        return runCatching {
+            val momento = Instant.parse(iso).toLocalDateTime(FUSO)
+            "%02d/%02d".format(momento.dayOfMonth, momento.monthNumber)
+        }.getOrDefault("")
+    }
+
     fun rotuloStatus(status: String?): String = when (status) {
         "agendado" -> "Agendado"
         "concluido" -> "Concluído"

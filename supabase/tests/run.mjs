@@ -1319,6 +1319,179 @@ await teste('se o pg_net falhar, a reserva do cliente continua valendo', async (
 await dbp.close()
 
 // =====================================================================
+grupo('Clube Arte 10: planos, promoções, cancelamento e ordem dos serviços')
+// =====================================================================
+// Banco próprio: estes testes mexem em limites e horários do dia.
+const dbc = await criarBanco({ agendaDeTeste: false })
+const umaC = async (sql, params = []) => (await dbc.query(sql, params)).rows[0]
+const todasC = async (sql, params = []) => (await dbc.query(sql, params)).rows
+const ID_DONO_C = randomUUID()
+await dbc.query("insert into auth.users (id, email) values ($1, 'dono@clube.test')", [ID_DONO_C])
+await dbc.query("insert into public.administradores (user_id, nome) values ($1, 'Dono')", [ID_DONO_C])
+
+const CORTE_C = await umaC("select * from public.servicos where nome = 'Corte de cabelo'")
+const BARBA_C = await umaC("select * from public.servicos where nome = 'Barba completa'")
+const ELITE = await umaC("select * from public.planos where nome = 'Plano Elite'")
+const DIA_C = iso((await umaC(
+  `select g::date as d from generate_series((now() at time zone 'America/Sao_Paulo')::date + 1,
+     (now() at time zone 'America/Sao_Paulo')::date + 30, interval '1 day') g
+    where extract(dow from g) between 1 and 4 order by g limit 1`
+)).d)
+const DIA_C2 = iso((await umaC(
+  `select g::date as d from generate_series((now() at time zone 'America/Sao_Paulo')::date + 1,
+     (now() at time zone 'America/Sao_Paulo')::date + 30, interval '1 day') g
+    where extract(dow from g) between 1 and 4 order by g offset 1 limit 1`
+)).d)
+const TEL_PLANO = '17911112222'
+
+const anonC = (sql, params = []) => comoAnonimo(dbc, () => umaC(sql, params))
+const donoC = (sql, params = []) => comoAdmin(dbc, ID_DONO_C, () => umaC(sql, params))
+const agendarC = (servicoId, horario, telefone = TEL_PLANO, nome = 'Cliente do Plano', data = DIA_C) =>
+  anonC('select public.criar_agendamento($1,$2,$3,$4,$5) as r', [
+    servicoId, data, horario, nome, telefone,
+  ]).then((x) => x.r)
+const meuPlano = async (tel = TEL_PLANO) => (await anonC('select public.meu_plano($1) as r', [tel])).r.plano
+
+await teste('o site lê os planos e promoções ativos, mas não os planos dos clientes', async () => {
+  const planos = await comoAnonimo(dbc, () => todasC('select nome from public.planos order by ordem'))
+  igual(planos.map((p) => p.nome), ['Plano Classic', 'Plano Elite'], 'planos do site')
+  const promos = await comoAnonimo(dbc, () => todasC('select titulo from public.promocoes order by ordem'))
+  igual(promos.map((p) => p.titulo), ['Cliente Fiel', 'Corrente'], 'promoções do site')
+  await lancaErro(() => comoAnonimo(dbc, () => todasC('select * from public.assinaturas')), 'permission denied')
+  await lancaErro(
+    () => comoAnonimo(dbc, () => todasC("update public.planos set preco = 1")),
+    'permission denied'
+  )
+  verdadeiro(CORTE_C.usa_plano, 'corte de cabelo deveria descontar do plano')
+  falso(BARBA_C.usa_plano, 'barba não deveria descontar do plano')
+})
+
+await teste('pedir um plano avisa o dono e não deixa pedir dois', async () => {
+  const r = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', '(17) 91111-2222'])).r
+  verdadeiro(r.ok, `pedido recusado: ${r.mensagem}`)
+  igual(r.assinatura.status, 'solicitada')
+  const n = await umaC("select * from public.notificacoes where tipo = 'plano_solicitado'")
+  verdadeiro(n.corpo.includes('Cliente do Plano') && n.corpo.includes('Plano Elite') && n.corpo.includes('110,00'), n.corpo)
+  const de_novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
+  igual(de_novo.erro, 'PLANO_JA_SOLICITADO')
+  igual((await meuPlano()).status, 'solicitada')
+})
+
+await teste('plano pedido (ainda não pago) não desconta corte', async () => {
+  const r = await agendarC(CORTE_C.id, '09:00')
+  verdadeiro(r.ok, r.mensagem)
+  igual(r.agendamento.plano, null, 'descontou antes do dono ativar')
+})
+
+await teste('só o dono ativa o plano; a validade começa na ativação', async () => {
+  const s = await umaC("select id from public.assinaturas where status = 'solicitada'")
+  await lancaErro(() => anonC('select public.ativar_assinatura($1)', [s.id]), 'permission denied')
+  const r = (await donoC('select public.ativar_assinatura($1) as r', [s.id])).r
+  verdadeiro(r.ok, r.mensagem)
+  const dias = await umaC("select round(extract(epoch from expira_em - now()) / 86400) as d from public.assinaturas where id = $1", [s.id])
+  igual(Number(dias.d), 30, 'validade')
+  igual((await donoC('select public.ativar_assinatura($1) as r', [s.id])).r.erro, 'ASSINATURA_ESTADO')
+})
+
+await teste('agendar corte desconta 1 do plano e conta ao cliente quantos restam', async () => {
+  const r = await agendarC(CORTE_C.id, '10:00')
+  verdadeiro(r.ok, r.mensagem)
+  igual(r.agendamento.plano.nome, 'Plano Elite')
+  igual(r.agendamento.plano.numero, 1)
+  igual(r.agendamento.plano.restantes, 3)
+  const n = await umaC('select corpo from public.notificacoes where agendamento_id = $1', [r.agendamento.id])
+  verdadeiro(n.corpo.endsWith('Plano Elite (1/4)'), `push do dono sem o plano: ${n.corpo}`)
+  igual((await meuPlano()).restantes, 3)
+})
+
+await teste('serviço que não é corte não mexe no plano', async () => {
+  const r = await agendarC(BARBA_C.id, '11:00')
+  verdadeiro(r.ok, r.mensagem)
+  igual(r.agendamento.plano, null)
+  igual((await meuPlano()).restantes, 3)
+})
+
+await teste('o dono cancela: o horário volta a ficar livre e o corte volta para o plano', async () => {
+  const ag = await umaC("select a.id from public.agendamentos a join public.plano_usos u on u.agendamento_id = a.id")
+  await lancaErro(() => anonC('select public.cancelar_agendamento($1)', [ag.id]), 'permission denied')
+  const r = (await donoC("select public.cancelar_agendamento($1, 'Barbeiro doente') as r", [ag.id])).r
+  verdadeiro(r.ok, r.mensagem)
+  verdadeiro(r.agendamento.cancelado, 'não ficou cancelado')
+  igual((await meuPlano()).restantes, 4, 'corte não voltou')
+  const livre = await comoAnonimo(dbc, () =>
+    umaC("select disponivel from public.horarios_disponiveis($1,$2) where horario = '10:00'", [CORTE_C.id, DIA_C])
+  )
+  verdadeiro(livre.disponivel, 'horário cancelado continua ocupado no site')
+  const pub = await umaC('select count(*)::int as n from public.agenda_publica where id = $1', [ag.id])
+  igual(pub.n, 0, 'cancelado continua no espelho público')
+  const agenda = (await donoC('select public.agenda_do_dia($1) as r', [DIA_C])).r
+  falso(agenda.itens.some((i) => i.id === ag.id), 'cancelado continua na agenda do dia')
+  // Outra pessoa consegue pegar o mesmo horário.
+  const outro = await agendarC(BARBA_C.id, '10:00', '17933334444', 'Outro Cliente')
+  verdadeiro(outro.ok, `horário liberado não aceitou nova reserva: ${outro.mensagem}`)
+  igual((await donoC('select public.cancelar_agendamento($1) as r', [ag.id])).r.erro, 'AGENDAMENTO_JA_CANCELADO')
+})
+
+await teste('cancelamento não se desfaz, não vale para o passado e não passa por fora da função', async () => {
+  const ag = await umaC('select id from public.agendamentos where cancelado_em is not null limit 1')
+  await lancaErro(
+    () => dbc.query('update public.agendamentos set cancelado_em = null where id = $1', [ag.id]),
+    'AGENDAMENTO_JA_CANCELADO'
+  )
+  await lancaErro(
+    () => comoAdmin(dbc, ID_DONO_C, () => dbc.query('delete from public.agendamentos where id = $1', [ag.id])),
+    'permission denied'
+  )
+  const passado = await umaC(
+    `with c as (insert into public.clientes (nome, telefone) values ('Antigo', '17955556666') returning id)
+     insert into public.agendamentos (cliente_id, cliente_nome, servico_id, data, horario_inicio, horario_fim,
+       inicio_em, fim_em, servico_nome, servico_preco, servico_duracao, origem)
+     select c.id, 'Antigo', $1, current_date - 1, '10:00', '10:35', now() - interval '1 day',
+            now() - interval '1 day' + interval '35 minutes', 'Corte de cabelo', 35, 35, 'balcao'
+       from c returning id`,
+    [CORTE_C.id]
+  )
+  igual((await donoC('select public.cancelar_agendamento($1) as r', [passado.id])).r.erro, 'CANCELAMENTO_TARDE')
+})
+
+await teste('usou todos os cortes: o plano fecha e o cliente pode pegar outro', async () => {
+  // Libera o limite de reservas em aberto por telefone para este teste.
+  await dbc.query('update public.config_barbearia set max_agendamentos_futuros = 20')
+  for (const h of ['08:00', '08:45', '09:30', '10:15']) {
+    const r = await agendarC(CORTE_C.id, h, TEL_PLANO, 'Cliente do Plano', DIA_C2)
+    verdadeiro(r.ok && r.agendamento.plano, `${h}: ${r.mensagem}`)
+  }
+  const p = await meuPlano()
+  igual([p.status, p.restantes], ['encerrada', 0])
+  const extra = await agendarC(CORTE_C.id, '11:00', TEL_PLANO, 'Cliente do Plano', DIA_C2)
+  igual(extra.agendamento.plano, null, 'descontou além do total')
+  const novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
+  verdadeiro(novo.ok, `não deixou pedir novo plano: ${novo.mensagem}`)
+})
+
+await teste('o dono pode recusar um pedido', async () => {
+  const s = await umaC("select id from public.assinaturas where status = 'solicitada'")
+  igual((await donoC('select public.encerrar_assinatura($1) as r', [s.id])).r.assinatura.status, 'recusada')
+  const lista = await comoAdmin(dbc, ID_DONO_C, () => todasC('select status from public.assinaturas_resumo order by solicitada_em'))
+  igual(lista.map((x) => x.status), ['encerrada', 'recusada'])
+  await lancaErro(() => comoAnonimo(dbc, () => todasC('select * from public.assinaturas_resumo')), 'permission denied')
+})
+
+await teste('o dono muda a ordem dos serviços (e o site segue essa ordem)', async () => {
+  const antes = await todasC('select id, nome from public.servicos order by ordem, nome')
+  const invertida = antes.map((s) => s.id).reverse()
+  await lancaErro(() => anonC('select public.reordenar_servicos($1::uuid[])', [invertida]), 'permission denied')
+  const r = (await donoC('select public.reordenar_servicos($1::uuid[]) as r', [invertida])).r
+  verdadeiro(r.ok, r.mensagem)
+  const depois = await comoAnonimo(dbc, () => todasC('select nome from public.servicos order by ordem, nome'))
+  igual(depois.map((s) => s.nome), antes.map((s) => s.nome).reverse())
+  const repetido = [invertida[0], invertida[0]]
+  igual((await donoC('select public.reordenar_servicos($1::uuid[]) as r', [repetido])).r.erro, 'SERVICOS_INVALIDOS')
+})
+
+await dbc.close()
+
+// =====================================================================
 const falhas = relatorio()
 await db.close()
 process.exit(falhas > 0 ? 1 : 0)

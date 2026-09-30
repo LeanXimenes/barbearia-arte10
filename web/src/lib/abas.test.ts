@@ -4,12 +4,14 @@ import { abaDoEndereco, direcaoDoDeslize } from './abas'
 describe('abaDoEndereco', () => {
   it('abre a aba do endereço', () => {
     expect(abaDoEndereco('#servicos')).toBe(1)
-    expect(abaDoEndereco('#contato')).toBe(3)
+    expect(abaDoEndereco('#contato')).toBe(4)
+    expect(abaDoEndereco('#clube')).toBe(2)
   })
 
   it('aceita os endereços antigos', () => {
-    expect(abaDoEndereco('#funcionamento')).toBe(2)
-    expect(abaDoEndereco('#localizacao')).toBe(3)
+    expect(abaDoEndereco('#funcionamento')).toBe(3)
+    expect(abaDoEndereco('#localizacao')).toBe(4)
+    expect(abaDoEndereco('#promocoes')).toBe(2)
   })
 
   it('cai no início quando o endereço é vazio ou desconhecido', () => {
@@ -35,10 +37,10 @@ describe('direcaoDoDeslize', () => {
 
 describe('aba App', () => {
   it('abre pelo endereço #app', () => {
-    expect(abaDoEndereco('#app')).toBe(4)
+    expect(abaDoEndereco('#app')).toBe(5)
   })
 
   it('no app instalado (sem a aba App) o endereço #app cai no início', () => {
-    expect(abaDoEndereco('#app', 4)).toBe(0)
+    expect(abaDoEndereco('#app', 5)).toBe(0)
   })
 })

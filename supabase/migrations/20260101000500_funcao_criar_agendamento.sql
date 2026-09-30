@@ -210,7 +210,8 @@ begin
   end if;
 
   -- 12) Conferencia explicita de sobreposicao (item 32).
-  if exists (select 1 from public.agendamentos a where a.periodo && v_range) then
+  if exists (select 1 from public.agendamentos a
+              where a.periodo && v_range and a.cancelado_em is null) then
     return public.resposta_erro('HORARIO_OCUPADO');
   end if;
 
@@ -221,7 +222,8 @@ begin
       from public.agendamentos a
      where a.cliente_id = v_cliente_id
        and a.inicio_em > now()
-       and a.status = 'agendado';
+       and a.status = 'agendado'
+       and a.cancelado_em is null;
 
     if v_futuros >= v_cfg.max_agendamentos_futuros then
       return public.resposta_erro('LIMITE_AGENDAMENTOS');

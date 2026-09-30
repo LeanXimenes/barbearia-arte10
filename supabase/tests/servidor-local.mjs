@@ -19,8 +19,21 @@ import { criarBanco } from './harness.mjs'
 const PORTA = Number(process.env.PORTA ?? 54321)
 
 // Só estas tabelas e funções são acessíveis, exatamente como o site usa.
-const TABELAS_PERMITIDAS = new Set(['servicos', 'config_barbearia', 'config_horarios', 'agenda_publica'])
-const FUNCOES_PERMITIDAS = new Set(['horarios_disponiveis', 'dias_disponiveis', 'criar_agendamento'])
+const TABELAS_PERMITIDAS = new Set([
+  'servicos',
+  'config_barbearia',
+  'config_horarios',
+  'agenda_publica',
+  'planos',
+  'promocoes',
+])
+const FUNCOES_PERMITIDAS = new Set([
+  'horarios_disponiveis',
+  'dias_disponiveis',
+  'criar_agendamento',
+  'solicitar_plano',
+  'meu_plano',
+])
 
 const IDENTIFICADOR = /^[a-z_][a-z0-9_]*$/
 

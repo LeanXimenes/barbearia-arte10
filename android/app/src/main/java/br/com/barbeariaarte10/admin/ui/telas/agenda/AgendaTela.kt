@@ -1,5 +1,6 @@
 package br.com.barbeariaarte10.admin.ui.telas.agenda
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,6 +75,18 @@ fun AgendaTela(
         }
     }
     LaunchedEffect(online) { if (online) modelo.carregar(silencioso = true) }
+
+    // Cancelou com "avisar no WhatsApp": abre a conversa já com a mensagem.
+    val contexto = LocalContext.current
+    LaunchedEffect(estado.linkAviso) {
+        val link = estado.linkAviso ?: return@LaunchedEffect
+        runCatching {
+            contexto.startActivity(
+                Intent(Intent.ACTION_VIEW, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+        modelo.limparLinkAviso()
+    }
 
     Column(Modifier.fillMaxWidth()) {
         BarraDeDatas(
@@ -179,6 +194,7 @@ fun AgendaTela(
             aoBloquear = { motivo -> modelo.bloquear(item, motivo) },
             aoDesbloquear = { modelo.desbloquear(item) },
             aoMarcarStatus = { status -> modelo.marcarStatus(item, status) },
+            aoCancelar = { motivo, avisar -> modelo.cancelar(item, motivo, avisar) },
         )
     }
 }

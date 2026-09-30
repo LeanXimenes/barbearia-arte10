@@ -1,9 +1,17 @@
 import { ABAS, type IdAba } from '../lib/abas'
-import { IconeCelular, IconeInicio, IconeLocal, IconeRelogio, IconeTesoura } from './Icones'
+import {
+  IconeCelular,
+  IconeCoroa,
+  IconeInicio,
+  IconeLocal,
+  IconeRelogio,
+  IconeTesoura,
+} from './Icones'
 
 const ICONES: Record<IdAba, typeof IconeInicio> = {
   inicio: IconeInicio,
   servicos: IconeTesoura,
+  clube: IconeCoroa,
   horarios: IconeRelogio,
   contato: IconeLocal,
   app: IconeCelular,

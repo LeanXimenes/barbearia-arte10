@@ -26,7 +26,7 @@ select
   min(a.inicio_em) filter (where a.inicio_em > now()
                              and a.status = 'agendado')                   as proximo_horario
 from public.clientes c
-left join public.agendamentos a on a.cliente_id = c.id
+left join public.agendamentos a on a.cliente_id = c.id and a.cancelado_em is null
 group by c.id, c.nome, c.telefone, c.created_at;
 
 revoke all on public.clientes_resumo from public, anon, authenticated;

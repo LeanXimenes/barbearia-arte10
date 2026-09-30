@@ -16,9 +16,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +31,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,10 +62,9 @@ import kotlinx.datetime.LocalDate
 /**
  * Folha de detalhes de um item da agenda.
  *
- * REGRA ABSOLUTA (item 14): quando o item é um agendamento de cliente,
- * esta tela é somente leitura no que diz respeito ao horário. Não existe
- * botão de cancelar nem de excluir — só dá para registrar o desfecho do
- * atendimento, e nenhum desses estados libera o horário.
+ * Agendamento de cliente: nunca é excluído. Antes do horário o dono pode
+ * CANCELAR (fica no histórico como cancelado e o horário volta a ficar
+ * livre no site); depois do horário, só registra o desfecho do atendimento.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +76,7 @@ fun DetalheItem(
     aoBloquear: (String?) -> Unit,
     aoDesbloquear: () -> Unit,
     aoMarcarStatus: (String) -> Unit,
+    aoCancelar: (motivo: String?, avisarCliente: Boolean) -> Unit,
 ) {
     val estadoFolha = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contexto = LocalContext.current
@@ -92,7 +95,8 @@ fun DetalheItem(
                 .padding(horizontal = 20.dp, vertical = 22.dp),
         ) {
             when {
-                item.ehAgendamento -> DetalheAgendamento(item, data, contexto, processando, aoMarcarStatus)
+                item.ehAgendamento ->
+                    DetalheAgendamento(item, data, contexto, processando, aoMarcarStatus, aoCancelar)
 
                 item.ehBloqueio -> DetalheBloqueio(item, data, processando, aoDesbloquear)
 
@@ -128,7 +132,10 @@ private fun DetalheAgendamento(
     contexto: android.content.Context,
     processando: Boolean,
     aoMarcarStatus: (String) -> Unit,
+    aoCancelar: (motivo: String?, avisarCliente: Boolean) -> Unit,
 ) {
+    var confirmandoCancelamento by remember { mutableStateOf(false) }
+
     Column {
         Etiqueta(texto = "Agendamento do cliente", cor = Ouro)
         Spacer(Modifier.height(14.dp))
@@ -209,16 +216,90 @@ private fun DetalheAgendamento(
             Spacer(Modifier.height(12.dp))
         }
 
+        if (item.status == "agendado" && !jaComecou) {
+            OutlinedButton(
+                onClick = { confirmandoCancelamento = true },
+                enabled = !processando,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Erro),
+            ) {
+                Icon(Icons.Outlined.EventBusy, contentDescription = null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Cancelar este horário")
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
         Text(
             if (jaComecou) {
                 "Este horário pertence ao cliente e permanece registrado. " +
                     "Marcar o desfecho não libera o horário na agenda."
             } else {
-                "Este horário pertence ao cliente e permanece registrado. " +
-                    "Depois do horário você poderá marcar se ele foi atendido ou faltou."
+                "Se cancelar, o horário volta a ficar livre no site e fica no histórico como " +
+                    "cancelado. Depois do horário você poderá marcar se ele foi atendido ou faltou."
             },
             style = MaterialTheme.typography.bodySmall,
             color = TextoFraco,
+        )
+    }
+
+    if (confirmandoCancelamento) {
+        var motivo by remember { mutableStateOf("") }
+        val temWhatsapp = Formato.linkWhatsapp(item.clienteTelefone) != null
+
+        AlertDialog(
+            onDismissRequest = { confirmandoCancelamento = false },
+            containerColor = AzulNoite,
+            title = { Text("Cancelar o horário de ${item.clienteNome.orEmpty()}?") },
+            text = {
+                Column {
+                    Text(
+                        "${Formato.dataCurta(data)} às ${item.horarioInicio} · ${item.servicoNome.orEmpty()}. " +
+                            "O horário volta a ficar livre no site. Isso não pode ser desfeito.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSuave,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = motivo,
+                        onValueChange = { motivo = it.take(300) },
+                        label = { Text("Motivo (opcional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (temWhatsapp) {
+                        Button(
+                            onClick = {
+                                confirmandoCancelamento = false
+                                aoCancelar(motivo, true)
+                            },
+                            enabled = !processando,
+                            colors = ButtonDefaults.buttonColors(containerColor = Erro, contentColor = Color.White),
+                        ) {
+                            Text("Cancelar e avisar no WhatsApp")
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            confirmandoCancelamento = false
+                            aoCancelar(motivo, false)
+                        },
+                        enabled = !processando,
+                    ) {
+                        Text(if (temWhatsapp) "Só cancelar" else "Cancelar horário", color = Erro)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmandoCancelamento = false }) {
+                    Text("Voltar", color = TextoSuave)
+                }
+            },
         )
     }
 }

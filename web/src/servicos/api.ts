@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabase'
 import type {
   AgendamentoConfirmado,
+  Assinatura,
+  Plano,
+  Promocao,
+  RespostaPlano,
   ConfigBarbearia,
   DiaDisponivel,
   HorarioDoDia,
@@ -19,7 +23,7 @@ import type {
 export async function carregarServicos(): Promise<Servico[]> {
   const { data, error } = await supabase
     .from('servicos')
-    .select('id, nome, descricao, preco, duracao_minutos, ativo, ordem')
+    .select('id, nome, descricao, preco, duracao_minutos, ativo, ordem, usa_plano')
     .eq('ativo', true)
     .order('ordem', { ascending: true })
     .order('nome', { ascending: true })
@@ -36,7 +40,7 @@ export async function carregarConfig(): Promise<ConfigBarbearia | null> {
     .from('config_barbearia')
     .select(
       'nome, fuso, telefone_whatsapp, instagram, endereco, cidade, uf, mapa_url, ' +
-        'granularidade_minutos, antecedencia_minima_minutos, antecedencia_maxima_dias'
+        'granularidade_minutos, antecedencia_minima_minutos, antecedencia_maxima_dias',
     )
     .maybeSingle()
 
@@ -57,7 +61,7 @@ export async function carregarFuncionamento(): Promise<HorarioFuncionamento[]> {
 export async function carregarDias(
   servicoId: string,
   inicio: string,
-  fim: string
+  fim: string,
 ): Promise<DiaDisponivel[]> {
   const { data, error } = await supabase.rpc('dias_disponiveis', {
     p_servico_id: servicoId,
@@ -89,9 +93,7 @@ export interface PedidoDeAgendamento {
   chave: string
 }
 
-export async function criarAgendamento(
-  pedido: PedidoDeAgendamento
-): Promise<RespostaAgendamento> {
+export async function criarAgendamento(pedido: PedidoDeAgendamento): Promise<RespostaAgendamento> {
   const { data, error } = await supabase.rpc('criar_agendamento', {
     p_servico_id: pedido.servicoId,
     p_data: pedido.data,
@@ -119,7 +121,7 @@ export async function criarAgendamento(
  * banco devolve a reserva original.
  */
 export async function recuperarPorChave(
-  pedido: PedidoDeAgendamento
+  pedido: PedidoDeAgendamento,
 ): Promise<AgendamentoConfirmado | null> {
   const resposta = await criarAgendamento(pedido)
   return resposta.ok ? resposta.agendamento : null
@@ -155,4 +157,60 @@ function assinar(tabelas: string[], aoMudar: AoMudar): () => void {
   return () => {
     void supabase.removeChannel(canal)
   }
+}
+
+// ---------------------------------------------------------------------
+// Clube Arte 10: planos e promoções
+// ---------------------------------------------------------------------
+
+export async function carregarPlanos(): Promise<Plano[]> {
+  const { data, error } = await supabase
+    .from('planos')
+    .select(
+      'id, nome, chamada, preco, preco_referencia, cortes, validade_dias, beneficios, destaque',
+    )
+    .eq('ativo', true)
+    .order('ordem', { ascending: true })
+    .order('preco', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map((p) => ({
+    ...p,
+    preco: Number(p.preco),
+    preco_referencia: p.preco_referencia === null ? null : Number(p.preco_referencia),
+    beneficios: p.beneficios ?? [],
+  })) as Plano[]
+}
+
+export async function carregarPromocoes(): Promise<Promocao[]> {
+  const { data, error } = await supabase
+    .from('promocoes')
+    .select('id, titulo, chamada, descricao, itens, observacao')
+    .eq('ativo', true)
+    .order('ordem', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map((p) => ({ ...p, itens: p.itens ?? [] })) as Promocao[]
+}
+
+export async function solicitarPlano(
+  planoId: string,
+  nome: string,
+  telefone: string,
+): Promise<RespostaPlano> {
+  const { data, error } = await supabase.rpc('solicitar_plano', {
+    p_plano_id: planoId,
+    p_nome: nome,
+    p_telefone: telefone,
+  })
+  if (error) throw error
+  return data as RespostaPlano
+}
+
+/** Plano (pedido, ativo ou recém-encerrado) ligado a um telefone. */
+export async function consultarMeuPlano(telefone: string): Promise<Assinatura | null> {
+  const { data, error } = await supabase.rpc('meu_plano', { p_telefone: telefone })
+  if (error) throw error
+  const r = data as { ok: boolean; plano: Assinatura | null }
+  return r?.ok ? r.plano : null
 }

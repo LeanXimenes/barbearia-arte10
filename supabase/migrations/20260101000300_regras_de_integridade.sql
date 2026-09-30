@@ -45,6 +45,31 @@ begin
             errcode = 'check_violation';
   end if;
 
+  -- Cancelamento (só pelo dono, via cancelar_agendamento): acontece uma
+  -- vez, antes do horário, e não se desfaz.
+  if new.cancelado_em is distinct from old.cancelado_em then
+    if old.cancelado_em is not null or new.cancelado_em is null then
+      raise exception 'AGENDAMENTO_JA_CANCELADO'
+        using detail  = 'Um cancelamento nao pode ser desfeito nem alterado.',
+              errcode = 'check_violation';
+    end if;
+    if old.inicio_em <= now() or old.status <> 'agendado' then
+      raise exception 'CANCELAMENTO_TARDE'
+        using detail  = 'So da para cancelar antes do horario marcado.',
+              errcode = 'check_violation';
+    end if;
+  elsif new.cancelado_motivo is distinct from old.cancelado_motivo then
+    raise exception 'AGENDAMENTO_IMUTAVEL'
+      using detail  = 'O motivo so e gravado junto com o cancelamento.',
+            errcode = 'check_violation';
+  end if;
+
+  if old.cancelado_em is not null and new.status is distinct from old.status then
+    raise exception 'AGENDAMENTO_JA_CANCELADO'
+      using detail  = 'Agendamento cancelado nao recebe desfecho.',
+            errcode = 'check_violation';
+  end if;
+
   -- O desfecho (atendido / não compareceu) só existe depois que o horário
   -- começou. Isso impede, por exemplo, marcar reservas futuras como falta
   -- para contornar o limite de reservas por telefone.
@@ -149,6 +174,14 @@ begin
   if tg_op = 'DELETE' then
     delete from public.agenda_publica where id = old.id;
     return old;
+  end if;
+
+  -- Agendamento cancelado libera o horário no site.
+  if tg_op = 'UPDATE' and v_origem = 'agendamento' then
+    if new.cancelado_em is not null then
+      delete from public.agenda_publica where id = new.id;
+      return new;
+    end if;
   end if;
 
   if tg_op = 'UPDATE' then

@@ -48,13 +48,11 @@ export function SecaoServicos({ servicos, carregando, erro, aoAgendar, aoRecarre
           {servicos.map((servico) => (
             <li key={servico.id} className="cartao servico">
               <div className="servico__info">
-                <h3 className="servico__nome">{servico.nome}</h3>
-                <span className="servico__detalhe">
-                  {duracao(servico.duracao_minutos)}
-                  {servico.descricao && (
-                    <span className="servico__descricao"> · {servico.descricao}</span>
-                  )}
-                </span>
+                <h3 className="servico__nome">
+                  {servico.nome}
+                  <span className="servico__duracao">{duracao(servico.duracao_minutos)}</span>
+                </h3>
+                {servico.descricao && <p className="servico__descricao">{servico.descricao}</p>}
               </div>
               <span className="servico__preco">{moeda(servico.preco)}</span>
               <button

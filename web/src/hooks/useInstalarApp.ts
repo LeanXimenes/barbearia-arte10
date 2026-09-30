@@ -8,6 +8,13 @@ interface EventoInstalacao extends Event {
 
 export type Plataforma = 'iphone' | 'android' | 'computador'
 
+/**
+ * De onde o cliente abriu o site. "interno" = navegador de dentro do
+ * Instagram/Facebook/TikTok: ali não dá para instalar, é preciso abrir no
+ * navegador de verdade (Chrome no Android, Safari no iPhone).
+ */
+export type Navegador = 'chrome' | 'safari' | 'interno' | 'outro'
+
 /** Já está aberto como app instalado (tela cheia, sem barra do navegador)? */
 export function abertoComoApp(): boolean {
   const standalone = (navigator as Navigator & { standalone?: boolean }).standalone
@@ -25,6 +32,34 @@ export function plataformaDe(userAgent: string, toque: boolean): Plataforma {
   }
   if (/android/i.test(userAgent)) return 'android'
   return 'computador'
+}
+
+export function navegadorDe(userAgent: string, plataforma: Plataforma): Navegador {
+  if (
+    /instagram|fban|fbav|fb_iab|fbios|tiktok|musical_ly|bytedancewebview|line\/|snapchat|pinterest|; wv\)/i.test(
+      userAgent,
+    )
+  ) {
+    return 'interno'
+  }
+  if (plataforma === 'iphone') {
+    // No iPhone, Chrome/Firefox/Edge/Opera se identificam com CriOS, FxiOS...
+    return /crios|fxios|edgios|opios|opt\//i.test(userAgent) ? 'outro' : 'safari'
+  }
+  // Opera, Samsung, Edge, Firefox, Mi... também dizem "Chrome": exclui antes.
+  if (
+    /opr\/|opera|samsungbrowser|edga?\/|firefox|miuibrowser|ucbrowser|yabrowser/i.test(userAgent)
+  ) {
+    return 'outro'
+  }
+  return /chrome\//i.test(userAgent) ? 'chrome' : 'outro'
+}
+
+/** Link que abre ESTA página no Chrome do Android, já na aba App. */
+export function linkAbrirNoChrome(url: URL): string {
+  const destino = `${url.host}${url.pathname}?instalar=1`
+  const reserva = encodeURIComponent(`${url.origin}${url.pathname}?instalar=1`)
+  return `intent://${destino}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${reserva};end`
 }
 
 export function useInstalarApp() {
@@ -56,10 +91,13 @@ export function useInstalarApp() {
     setEvento(null) // o navegador só deixa usar o convite uma vez
   }
 
+  const plataforma = plataformaDe(navigator.userAgent, navigator.maxTouchPoints > 1)
+
   return {
     podeInstalarComUmToque: evento !== null,
     instalar,
     instalado,
-    plataforma: plataformaDe(navigator.userAgent, navigator.maxTouchPoints > 1),
+    plataforma,
+    navegador: navegadorDe(navigator.userAgent, plataforma),
   }
 }

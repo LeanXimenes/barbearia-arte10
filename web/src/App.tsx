@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDadosDaBarbearia } from './hooks/useDadosDaBarbearia'
 import { useOnline } from './hooks/useOnline'
 import { supabaseConfigurado } from './lib/supabase'
-import { ABAS, abaDoEndereco, direcaoDoDeslize } from './lib/abas'
+import { ABAS, abaDoEndereco, direcaoDoDeslize, indiceDaAba, type IdAba } from './lib/abas'
 import { Cabecalho } from './componentes/Cabecalho'
 import { BarraAbas } from './componentes/BarraAbas'
 import { Hero } from './componentes/Hero'
@@ -10,6 +10,7 @@ import { SecaoServicos } from './componentes/SecaoServicos'
 import { SecaoFuncionamento } from './componentes/SecaoFuncionamento'
 import { SecaoLocalizacao } from './componentes/SecaoLocalizacao'
 import { SecaoApp } from './componentes/SecaoApp'
+import { SecaoClube } from './componentes/SecaoClube'
 import { abertoComoApp } from './hooks/useInstalarApp'
 import { ModalAgendamento } from './componentes/agendamento/ModalAgendamento'
 import { IconeAlerta } from './componentes/Icones'
@@ -20,7 +21,12 @@ export default function App() {
 
   // Quem já abriu pelo app instalado não precisa da aba que ensina a instalar.
   const [total] = useState(() => (abertoComoApp() ? ABAS.length - 1 : ABAS.length))
-  const [aba, setAba] = useState(() => abaDoEndereco(window.location.hash, total))
+  const [aba, setAba] = useState(() =>
+    // "?instalar=1" vem do botão "Abrir no Chrome" da aba App.
+    new URLSearchParams(window.location.search).has('instalar') && total === ABAS.length
+      ? indiceDaAba('app')
+      : abaDoEndereco(window.location.hash, total),
+  )
   const paineis = useRef<(HTMLElement | null)[]>([])
   const toque = useRef<{ x: number; y: number } | null>(null)
 
@@ -69,8 +75,10 @@ export default function App() {
     if (direcao) irPara(aba + direcao)
   }
 
-  const painel = (indice: number) => {
-    const id = ABAS[indice]?.id
+  const irParaAba = (id: IdAba) => irPara(indiceDaAba(id))
+
+  const painel = (id: IdAba) => {
+    const indice = indiceDaAba(id)
     return {
       ref: (el: HTMLElement | null) => {
         paineis.current[indice] = el
@@ -111,18 +119,18 @@ export default function App() {
 
       <main className="palco" onTouchStart={aoTocar} onTouchEnd={aoSoltar}>
         <div className="trilho" style={{ transform: `translateX(-${aba * 100}%)` }}>
-          <section {...painel(0)}>
+          <section {...painel('inicio')}>
             <Hero
               config={config}
               funcionamento={funcionamento}
               aoAgendar={() => abrirAgendamento()}
-              aoVerServicos={() => irPara(1)}
-              aoVerHorarios={() => irPara(2)}
-              aoVerContato={() => irPara(3)}
+              aoVerServicos={() => irParaAba('servicos')}
+              aoVerHorarios={() => irParaAba('horarios')}
+              aoVerContato={() => irParaAba('contato')}
             />
           </section>
 
-          <section {...painel(1)}>
+          <section {...painel('servicos')}>
             <SecaoServicos
               servicos={servicos}
               carregando={carregando}
@@ -132,7 +140,11 @@ export default function App() {
             />
           </section>
 
-          <section {...painel(2)}>
+          <section {...painel('clube')}>
+            <SecaoClube config={config} />
+          </section>
+
+          <section {...painel('horarios')}>
             <SecaoFuncionamento
               funcionamento={funcionamento}
               config={config}
@@ -140,12 +152,12 @@ export default function App() {
             />
           </section>
 
-          <section {...painel(3)}>
+          <section {...painel('contato')}>
             <SecaoLocalizacao config={config} />
           </section>
 
           {total === ABAS.length && (
-            <section {...painel(4)}>
+            <section {...painel('app')}>
               <SecaoApp />
             </section>
           )}

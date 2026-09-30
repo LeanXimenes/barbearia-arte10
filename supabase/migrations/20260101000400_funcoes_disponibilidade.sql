@@ -38,6 +38,14 @@ as $$
     when 'AGENDAMENTO_NAO_ENCONTRADO' then 'Agendamento não encontrado.'
     when 'ATENDIMENTO_NAO_COMECOU' then 'Só dá para registrar o atendimento depois do horário marcado.'
     when 'MUITAS_TENTATIVAS'    then 'Muitos agendamentos em pouco tempo. Tente novamente em alguns minutos.'
+    when 'AGENDAMENTO_JA_CANCELADO' then 'Esse agendamento já foi cancelado.'
+    when 'CANCELAMENTO_TARDE'   then 'Só dá para cancelar antes do horário marcado.'
+    when 'PLANO_INDISPONIVEL'   then 'Esse plano não está disponível no momento.'
+    when 'PLANO_JA_ATIVO'       then 'Você já tem um plano ativo. Use os cortes dele antes de pegar outro.'
+    when 'PLANO_JA_SOLICITADO'  then 'Você já pediu um plano. A barbearia vai confirmar com você.'
+    when 'ASSINATURA_NAO_ENCONTRADA' then 'Pedido de plano não encontrado.'
+    when 'ASSINATURA_ESTADO'    then 'Esse plano não pode mais ser alterado.'
+    when 'SERVICOS_INVALIDOS'   then 'Lista de serviços inválida. Atualize e tente de novo.'
     when 'DADOS_INVALIDOS'      then 'Não foi possível processar o pedido. Atualize a página e tente novamente.'
     else 'Não foi possível concluir a operação. Tente novamente.'
   end;
@@ -160,7 +168,8 @@ begin
   select coalesce(array_agg(a.periodo), '{}')
     into v_ocupados
     from public.agendamentos a
-   where a.periodo && v_janela;
+   where a.periodo && v_janela
+     and a.cancelado_em is null;
 
   select coalesce(array_agg(b.periodo), '{}')
     into v_bloqueados

@@ -75,7 +75,8 @@ begin
   perform pg_advisory_xact_lock(hashtext('barbearia_arte10:agenda'));
 
   -- REGRA: bloquear nunca pode apagar/atropelar o agendamento de um cliente.
-  if exists (select 1 from public.agendamentos a where a.periodo && v_range) then
+  if exists (select 1 from public.agendamentos a
+              where a.periodo && v_range and a.cancelado_em is null) then
     return public.resposta_erro('EXISTE_AGENDAMENTO');
   end if;
 
@@ -230,6 +231,7 @@ begin
       from public.agendamentos a
       join public.clientes c on c.id = a.cliente_id
      where a.data = p_data
+       and a.cancelado_em is null
     union all
     select 'bloqueio', b.id, b.inicio_em, b.fim_em,
            (b.inicio_em at time zone v_cfg.fuso)::timestamp,
@@ -382,7 +384,8 @@ begin
       left join public.config_horarios h
         on h.dia_semana = extract(dow from g)::smallint
       left join lateral (
-        select count(*) as qtd from public.agendamentos a where a.data = g::date
+        select count(*) as qtd from public.agendamentos a
+         where a.data = g::date and a.cancelado_em is null
       ) ag on true
       left join lateral (
         select count(*) as qtd from public.bloqueios b where b.data = g::date

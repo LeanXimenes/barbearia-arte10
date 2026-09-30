@@ -16,6 +16,8 @@ data class Servico(
     @SerialName("duracao_minutos") val duracaoMinutos: Int,
     val ativo: Boolean,
     val ordem: Int = 0,
+    /** Desconta um corte do plano do Clube quando o cliente agenda. */
+    @SerialName("usa_plano") val usaPlano: Boolean = false,
 )
 
 @Serializable
@@ -26,6 +28,7 @@ data class ServicoEdicao(
     @SerialName("duracao_minutos") val duracaoMinutos: Int,
     val ativo: Boolean,
     val ordem: Int = 0,
+    @SerialName("usa_plano") val usaPlano: Boolean = false,
 )
 
 @Serializable
@@ -170,7 +173,31 @@ data class AgendamentoHistorico(
     @SerialName("servico_duracao") val servicoDuracao: Int,
     @SerialName("created_at") val criadoEm: String,
     @SerialName("clientes") val cliente: ClienteEmbutido? = null,
+    /** Preenchido quando o dono cancelou o horário pelo app. */
+    @SerialName("cancelado_em") val canceladoEm: String? = null,
 )
+
+// ------------------------------------------------------- Clube Arte 10
+
+/** Plano de um cliente (pedido, ativo ou encerrado). */
+@Serializable
+data class AssinaturaResumo(
+    val id: String,
+    @SerialName("cliente_nome") val clienteNome: String,
+    @SerialName("cliente_telefone") val clienteTelefone: String,
+    @SerialName("plano_nome") val planoNome: String,
+    val preco: Double,
+    @SerialName("cortes_total") val cortesTotal: Int,
+    @SerialName("cortes_usados") val cortesUsados: Int,
+    /** solicitada | ativa | encerrada | recusada | cancelada */
+    val status: String,
+    @SerialName("solicitada_em") val solicitadaEm: String,
+    @SerialName("ativada_em") val ativadaEm: String? = null,
+    @SerialName("expira_em") val expiraEm: String? = null,
+    @SerialName("encerrada_em") val encerradaEm: String? = null,
+) {
+    val restantes: Int get() = cortesTotal - cortesUsados
+}
 
 @Serializable
 data class Administrador(

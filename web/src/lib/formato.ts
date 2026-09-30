@@ -133,3 +133,10 @@ export function linkMapa(config: {
   if (partes.length === 0) return null
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(partes.join(', '))}`
 }
+
+/** "29/10" de um instante (timestamptz), no fuso da barbearia. */
+export function diaMesDoInstante(iso: string, fuso = 'America/Sao_Paulo'): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit' })
+}

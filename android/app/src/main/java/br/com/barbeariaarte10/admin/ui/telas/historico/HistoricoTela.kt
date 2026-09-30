@@ -226,11 +226,14 @@ private fun LinhaHistorico(item: AgendamentoHistorico) {
             }
 
             Etiqueta(
-                texto = Formato.rotuloStatus(item.status),
-                cor = when (item.status) {
-                    "concluido" -> Sucesso
-                    "nao_compareceu" -> Erro
-                    else -> Ouro
+                texto = if (item.canceladoEm != null) "Cancelado" else Formato.rotuloStatus(item.status),
+                cor = when {
+                    item.canceladoEm != null -> Erro
+                    else -> when (item.status) {
+                        "concluido" -> Sucesso
+                        "nao_compareceu" -> Erro
+                        else -> Ouro
+                    }
                 },
             )
         }

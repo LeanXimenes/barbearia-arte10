@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   dataCurta,
   dataPorExtenso,
+  diaMesDoInstante,
   duracao,
   hora,
   linkWhatsapp,
@@ -91,7 +92,14 @@ describe('nome', () => {
 
 describe('estado da barbearia agora', () => {
   const semana = [
-    { dia_semana: 0, aberto: false, abre: null, fecha: null, intervalo_inicio: null, intervalo_fim: null },
+    {
+      dia_semana: 0,
+      aberto: false,
+      abre: null,
+      fecha: null,
+      intervalo_inicio: null,
+      intervalo_fim: null,
+    },
     {
       dia_semana: 1,
       aberto: true,
@@ -122,10 +130,10 @@ describe('estado da barbearia agora', () => {
 
   it('avisa antes de abrir e depois de fechar', () => {
     expect(estadoAgora(semana, { data: '2026-09-21', hora: '07:00', diaSemana: 1 }).detalhe).toBe(
-      'Abre às 09:00'
+      'Abre às 09:00',
     )
     expect(estadoAgora(semana, { data: '2026-09-21', hora: '20:00', diaSemana: 1 }).detalhe).toBe(
-      'Encerrado por hoje'
+      'Encerrado por hoje',
     )
   })
 })
@@ -142,5 +150,16 @@ describe('tratamento de falhas', () => {
     expect(exigeRecarregarHorarios('HORARIO_BLOQUEADO')).toBe(true)
     expect(exigeRecarregarHorarios('TELEFONE_INVALIDO')).toBe(false)
     expect(exigeRecarregarHorarios(undefined)).toBe(false)
+  })
+})
+
+describe('diaMesDoInstante', () => {
+  it('mostra dia/mês no fuso de São Paulo', () => {
+    // 02:00 UTC do dia 30 ainda é dia 29 em São Paulo.
+    expect(diaMesDoInstante('2026-10-30T02:00:00Z')).toBe('29/10')
+  })
+
+  it('devolve vazio para data inválida', () => {
+    expect(diaMesDoInstante('xyz')).toBe('')
   })
 })

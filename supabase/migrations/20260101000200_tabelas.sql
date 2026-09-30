@@ -135,6 +135,9 @@ create table if not exists public.servicos (
   constraint servicos_duracao_valida check (duracao_minutos between 5 and 480)
 );
 
+-- Serviço que consome um corte do plano do cliente (ex.: "Corte de cabelo").
+alter table public.servicos add column if not exists usa_plano boolean not null default false;
+
 create unique index if not exists servicos_nome_key on public.servicos (lower(btrim(nome)));
 create index if not exists servicos_ativo_ordem_idx on public.servicos (ativo, ordem, nome);
 
@@ -189,6 +192,34 @@ create table if not exists public.agendamentos (
   -- mesmo que duas transacoes cheguem exatamente no mesmo instante.
   constraint agendamentos_sem_sobreposicao exclude using gist (periodo with &&)
 );
+
+-- Cancelamento pelo dono (pelo app). O agendamento continua no histórico,
+-- mas deixa de ocupar o horário.
+alter table public.agendamentos add column if not exists cancelado_em     timestamptz;
+alter table public.agendamentos add column if not exists cancelado_motivo text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'agendamentos_cancel_motivo_tam') then
+    alter table public.agendamentos
+      add constraint agendamentos_cancel_motivo_tam
+      check (cancelado_motivo is null or char_length(cancelado_motivo) <= 300);
+  end if;
+
+  -- Bancos instalados antes do cancelamento: a trava passa a ignorar
+  -- os cancelados (o horário cancelado volta a ficar livre).
+  if exists (
+    select 1 from pg_constraint
+     where conname = 'agendamentos_sem_sobreposicao'
+       and pg_get_constraintdef(oid) not like '%cancelado_em%'
+  ) then
+    alter table public.agendamentos drop constraint agendamentos_sem_sobreposicao;
+    alter table public.agendamentos
+      add constraint agendamentos_sem_sobreposicao
+      exclude using gist (periodo with &&) where (cancelado_em is null);
+  end if;
+end
+$$;
 
 create unique index if not exists agendamentos_idempotency_key
   on public.agendamentos (idempotency_key)

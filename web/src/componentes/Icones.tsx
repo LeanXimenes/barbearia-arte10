@@ -35,6 +35,12 @@ export const IconeInicio = ({ tamanho = 20, className }: Props) => (
   </svg>
 )
 
+export const IconeCoroa = ({ tamanho = 20, className }: Props) => (
+  <svg {...base(tamanho)} className={className}>
+    <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z" />
+  </svg>
+)
+
 export const IconeCelular = ({ tamanho = 20, className }: Props) => (
   <svg {...base(tamanho)} className={className}>
     <rect x="6" y="2.5" width="12" height="19" rx="2.5" />

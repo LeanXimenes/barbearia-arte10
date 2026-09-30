@@ -8,7 +8,7 @@ import type {
   Servico,
 } from '../../lib/tipos'
 import { assinarAgenda, carregarDias, carregarHorarios, criarAgendamento } from '../../servicos/api'
-import { dataCurta, hora, nomeValido, telefoneValido } from '../../lib/formato'
+import { dataCurta, hora, mascararTelefone, nomeValido, telefoneValido } from '../../lib/formato'
 import { agoraNaBarbearia, somarDias } from '../../lib/relogio'
 import {
   MSG_SEM_CONEXAO,
@@ -20,6 +20,7 @@ import { EscolhaServico } from './EscolhaServico'
 import { EscolhaData } from './EscolhaData'
 import { EscolhaHorario } from './EscolhaHorario'
 import { FormularioDados } from './FormularioDados'
+import { lerCliente, salvarCliente, type ClienteSalvo } from '../../lib/clienteSalvo'
 import { Confirmacao } from './Confirmacao'
 import { IconeAlerta, IconeFechar, IconeVoltar } from '../Icones'
 
@@ -48,13 +49,7 @@ function novaChave(): string {
   return `k-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 }
 
-export function ModalAgendamento({
-  servicos,
-  config,
-  servicoInicialId,
-  online,
-  aoFechar,
-}: Props) {
+export function ModalAgendamento({ servicos, config, servicoInicialId, online, aoFechar }: Props) {
   const fuso = config?.fuso
   const hoje = useMemo(() => agoraNaBarbearia(fuso).data, [fuso])
   const janelaDias = config?.antecedencia_maxima_dias ?? 60
@@ -62,7 +57,7 @@ export function ModalAgendamento({
 
   const [passo, setPasso] = useState<Passo>(servicoInicialId ? 'data' : 'servico')
   const [servico, setServico] = useState<Servico | null>(
-    () => servicos.find((s) => s.id === servicoInicialId) ?? null
+    () => servicos.find((s) => s.id === servicoInicialId) ?? null,
   )
   const [data, setData] = useState<string | null>(null)
   const [horario, setHorario] = useState<string | null>(null)
@@ -77,8 +72,11 @@ export function ModalAgendamento({
   const [erroHorarios, setErroHorarios] = useState(false)
   const [avisoAtualizacao, setAvisoAtualizacao] = useState(false)
 
-  const [nome, setNome] = useState('')
-  const [telefone, setTelefone] = useState('')
+  // Quem já agendou neste celular não precisa digitar de novo.
+  const [salvo, setSalvo] = useState<ClienteSalvo | null>(() => lerCliente())
+  const [usandoSalvo, setUsandoSalvo] = useState(() => salvo !== null)
+  const [nome, setNome] = useState(() => salvo?.nome ?? '')
+  const [telefone, setTelefone] = useState(() => (salvo ? mascararTelefone(salvo.telefone) : ''))
   const [tentouEnviar, setTentouEnviar] = useState(false)
 
   const [enviando, setEnviando] = useState(false)
@@ -150,7 +148,7 @@ export function ModalAgendamento({
         setCarregandoDias(false)
       }
     },
-    [servico, mesVisivel, hoje, ultimaData]
+    [servico, mesVisivel, hoje, ultimaData],
   )
 
   const buscarHorarios = useCallback(
@@ -167,7 +165,7 @@ export function ModalAgendamento({
         setCarregandoHorarios(false)
       }
     },
-    [servico, data]
+    [servico, data],
   )
 
   useEffect(() => {
@@ -260,6 +258,13 @@ export function ModalAgendamento({
       })
 
       if (resposta.ok) {
+        const lembrado = {
+          nome: resposta.agendamento.cliente,
+          telefone: resposta.agendamento.telefone,
+        }
+        salvarCliente(lembrado)
+        setSalvo(lembrado)
+        setUsandoSalvo(true)
         setResultado({ agendamento: resposta.agendamento, barbearia: resposta.barbearia })
         setPasso('confirmado')
         void buscarHorarios(true)
@@ -279,9 +284,7 @@ export function ModalAgendamento({
       // Falha de transporte: NUNCA dizemos que deu certo. Se a reserva
       // tiver sido gravada, a mesma chave devolve o mesmo agendamento
       // quando a pessoa tentar de novo.
-      setErroEnvio(
-        pareceFalhaDeRede(erro) ? MSG_SEM_CONEXAO : mensagemDeFalha(erro)
-      )
+      setErroEnvio(pareceFalhaDeRede(erro) ? MSG_SEM_CONEXAO : mensagemDeFalha(erro))
     } finally {
       setEnviando(false)
     }
@@ -293,8 +296,9 @@ export function ModalAgendamento({
     setServico(null)
     setData(null)
     setHorario(null)
-    setNome('')
-    setTelefone('')
+    setNome(salvo?.nome ?? '')
+    setTelefone(salvo ? mascararTelefone(salvo.telefone) : '')
+    setUsandoSalvo(salvo !== null)
     setTentouEnviar(false)
     setErroEnvio(null)
   }
@@ -418,16 +422,27 @@ export function ModalAgendamento({
               nome={nome}
               telefone={telefone}
               tentouEnviar={tentouEnviar}
+              salvo={salvo}
+              usandoSalvo={usandoSalvo}
+              aoUsarOutro={() => {
+                setUsandoSalvo(false)
+                setNome('')
+                setTelefone('')
+                setTentouEnviar(false)
+              }}
+              aoUsarSalvo={() => {
+                if (!salvo) return
+                setUsandoSalvo(true)
+                setNome(salvo.nome)
+                setTelefone(mascararTelefone(salvo.telefone))
+              }}
               aoMudarNome={setNome}
               aoMudarTelefone={setTelefone}
             />
           )}
 
           {passo === 'confirmado' && resultado && (
-            <Confirmacao
-              agendamento={resultado.agendamento}
-              barbearia={resultado.barbearia}
-            />
+            <Confirmacao agendamento={resultado.agendamento} barbearia={resultado.barbearia} />
           )}
 
           {erroEnvio && passo !== 'confirmado' && (

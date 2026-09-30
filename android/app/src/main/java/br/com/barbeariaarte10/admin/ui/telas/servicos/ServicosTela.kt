@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -121,6 +124,34 @@ class ServicosViewModel : ViewModel() {
         }
     }
 
+    /** Sobe (-1) ou desce (+1) o serviço na lista. A ordem aparece igual no site. */
+    fun mover(servico: Servico, direcao: Int) {
+        if (_estado.value.salvando) return
+        val lista = _estado.value.servicos.toMutableList()
+        val de = lista.indexOfFirst { it.id == servico.id }
+        val para = de + direcao
+        if (de < 0 || para !in lista.indices) return
+
+        lista.add(para, lista.removeAt(de))
+        // Mostra a nova ordem na hora; se o banco recusar, recarrega a real.
+        _estado.update { it.copy(servicos = lista, salvando = true, aviso = null) }
+
+        viewModelScope.launch {
+            when (val r = Grafo.catalogo.reordenarServicos(lista.map { it.id })) {
+                is Resultado.Sucesso -> {
+                    _estado.update {
+                        it.copy(salvando = false, aviso = if (r.dado.ok) null else r.dado.mensagem)
+                    }
+                    if (!r.dado.ok) carregar()
+                }
+                is Resultado.Falha -> {
+                    _estado.update { it.copy(salvando = false, aviso = r.mensagem) }
+                    carregar()
+                }
+            }
+        }
+    }
+
     fun salvar(id: String?, dados: ServicoEdicao, aoTerminar: () -> Unit) {
         if (_estado.value.salvando) return
         _estado.update { it.copy(salvando = true, aviso = null) }
@@ -185,10 +216,24 @@ fun ServicosTela(
                 item { MensagemErro(mensagem = estado.erro!!, aoTentarNovamente = modelo::carregar) }
             }
 
-            items(estado.servicos, key = { it.id }) { servico ->
+            if (estado.servicos.size > 1) {
+                item {
+                    Text(
+                        "Use as setas para mudar a ordem. O site mostra na mesma ordem.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextoFraco,
+                    )
+                }
+            }
+
+            itemsIndexed(estado.servicos, key = { _, s -> s.id }) { indice, servico ->
                 CartaoServico(
                     servico = servico,
                     salvando = estado.salvando,
+                    podeSubir = indice > 0,
+                    podeDescer = indice < estado.servicos.lastIndex,
+                    aoSubir = { modelo.mover(servico, -1) },
+                    aoDescer = { modelo.mover(servico, +1) },
                     aoEditar = { editando = servico },
                     aoAlternar = { modelo.alternarAtivo(servico) },
                 )
@@ -231,12 +276,33 @@ fun ServicosTela(
 private fun CartaoServico(
     servico: Servico,
     salvando: Boolean,
+    podeSubir: Boolean,
+    podeDescer: Boolean,
+    aoSubir: () -> Unit,
+    aoDescer: () -> Unit,
     aoEditar: () -> Unit,
     aoAlternar: () -> Unit,
 ) {
     CartaoArte10(corDaBorda = if (servico.ativo) Ouro.copy(alpha = 0.22f) else Color(0x1F9AA8C6)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    IconButton(onClick = aoSubir, enabled = podeSubir && !salvando, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Outlined.KeyboardArrowUp,
+                            contentDescription = "Subir ${servico.nome}",
+                            tint = if (podeSubir) Ouro else TextoFraco.copy(alpha = 0.3f),
+                        )
+                    }
+                    IconButton(onClick = aoDescer, enabled = podeDescer && !salvando, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Outlined.KeyboardArrowDown,
+                            contentDescription = "Descer ${servico.nome}",
+                            tint = if (podeDescer) Ouro else TextoFraco.copy(alpha = 0.3f),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         servico.nome,
@@ -279,6 +345,11 @@ private fun CartaoServico(
                 )
             }
 
+            if (servico.usaPlano) {
+                Spacer(Modifier.height(10.dp))
+                Etiqueta(texto = "Desconta do plano do Clube", cor = Ouro)
+            }
+
             if (!servico.ativo) {
                 Spacer(Modifier.height(10.dp))
                 Etiqueta(texto = "Inativo — não aparece no site", cor = TextoFraco)
@@ -298,6 +369,7 @@ private fun DialogoServico(
     var descricao by remember { mutableStateOf(servico?.descricao.orEmpty()) }
     var preco by remember { mutableStateOf(servico?.preco?.toString().orEmpty()) }
     var duracao by remember { mutableStateOf(servico?.duracaoMinutos?.toString().orEmpty()) }
+    var usaPlano by remember { mutableStateOf(servico?.usaPlano ?: false) }
     var erro by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -346,6 +418,27 @@ private fun DialogoServico(
                     )
                 }
 
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Desconta do plano", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Quem tem plano do Clube usa 1 corte ao agendar este serviço.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextoFraco,
+                        )
+                    }
+                    Switch(
+                        checked = usaPlano,
+                        onCheckedChange = { usaPlano = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1204),
+                            checkedTrackColor = Ouro,
+                            uncheckedTrackColor = AzulNoite,
+                        ),
+                    )
+                }
+
                 erro?.let {
                     Spacer(Modifier.height(10.dp))
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -373,6 +466,7 @@ private fun DialogoServico(
                                 duracaoMinutos = minutos!!,
                                 ativo = servico?.ativo ?: true,
                                 ordem = servico?.ordem ?: 99,
+                                usaPlano = usaPlano,
                             ),
                         )
                     }

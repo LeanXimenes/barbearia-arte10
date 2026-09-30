@@ -57,6 +57,12 @@ values
   ('Sobrancelha',     'Acabamento simples para deixar o olhar alinhado.',      5.00, 10, true, 5)
 on conflict do nothing;
 
+-- O corte de cabelo é o serviço que desconta do plano do Clube Arte 10.
+update public.servicos
+   set usa_plano = true
+ where lower(btrim(nome)) = 'corte de cabelo'
+   and not exists (select 1 from public.servicos where usa_plano);
+
 -- ---------------------------------------------------------------------
 -- ADMINISTRADOR (proprietario)
 -- ---------------------------------------------------------------------

@@ -109,6 +109,24 @@ class AgendaRepositorio {
                 .decodeAs<RespostaSimples>()
         }
 
+    /**
+     * Cancela o horário de um cliente (só antes de acontecer). O horário
+     * volta a ficar livre no site e, se usou plano, o corte volta para o plano.
+     */
+    suspend fun cancelar(agendamentoId: String, motivo: String?): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc(
+                    "cancelar_agendamento",
+                    buildJsonObject {
+                        put("p_id", agendamentoId)
+                        val texto = motivo?.trim()?.takeIf { it.isNotEmpty() }
+                        put("p_motivo", if (texto == null) JsonNull else JsonPrimitive(texto))
+                    },
+                )
+                .decodeAs<RespostaSimples>()
+        }
+
     /** Histórico completo, do mais recente para o mais antigo (item 28). */
     suspend fun historico(
         ate: LocalDate,
@@ -119,7 +137,7 @@ class AgendaRepositorio {
             .select(
                 Columns.raw(
                     "id, data, horario_inicio, horario_fim, status, servico_nome, " +
-                        "servico_preco, servico_duracao, created_at, clientes(nome, telefone)"
+                        "servico_preco, servico_duracao, created_at, cancelado_em, clientes(nome, telefone)"
                 )
             ) {
                 filter { lte("data", ate.toString()) }
@@ -137,7 +155,7 @@ class AgendaRepositorio {
                 .select(
                     Columns.raw(
                         "id, data, horario_inicio, horario_fim, status, servico_nome, " +
-                            "servico_preco, servico_duracao, created_at, clientes(nome, telefone)"
+                            "servico_preco, servico_duracao, created_at, cancelado_em, clientes(nome, telefone)"
                     )
                 ) {
                     filter { eq("cliente_id", clienteId) }

@@ -2,6 +2,7 @@
 export const ABAS = [
   { id: 'inicio', texto: 'Início' },
   { id: 'servicos', texto: 'Serviços' },
+  { id: 'clube', texto: 'Clube' },
   { id: 'horarios', texto: 'Horários' },
   { id: 'contato', texto: 'Contato' },
   // Some quando o site já está aberto como app instalado.
@@ -14,6 +15,12 @@ export type IdAba = (typeof ABAS)[number]['id']
 const APELIDOS: Record<string, IdAba> = {
   funcionamento: 'horarios',
   localizacao: 'contato',
+  planos: 'clube',
+  promocoes: 'clube',
+}
+
+export function indiceDaAba(id: IdAba): number {
+  return ABAS.findIndex((a) => a.id === id)
 }
 
 export function abaDoEndereco(hash: string, total: number = ABAS.length): number {
