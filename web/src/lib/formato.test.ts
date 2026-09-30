@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   dataCurta,
   dataPorExtenso,
+  dataCurtaDoInstante,
   diaMesDoInstante,
   duracao,
   hora,
@@ -161,5 +162,15 @@ describe('diaMesDoInstante', () => {
 
   it('devolve vazio para data inválida', () => {
     expect(diaMesDoInstante('xyz')).toBe('')
+  })
+})
+
+describe('dataCurtaDoInstante', () => {
+  const agora = new Date('2026-10-01T12:00:00Z')
+  it('neste ano mostra só dia/mês', () => {
+    expect(dataCurtaDoInstante('2026-12-20T15:00:00Z', 'America/Sao_Paulo', agora)).toBe('20/12')
+  })
+  it('em outro ano mostra o ano (plano longo que vence no ano seguinte)', () => {
+    expect(dataCurtaDoInstante('2027-01-15T15:00:00Z', 'America/Sao_Paulo', agora)).toBe('15/01/2027')
   })
 })

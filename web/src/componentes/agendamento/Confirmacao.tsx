@@ -1,7 +1,7 @@
 import type { AgendamentoConfirmado, DadosBarbearia } from '../../lib/tipos'
 import {
   dataPorExtenso,
-  diaMesDoInstante,
+  dataCurtaDoInstante,
   duracao,
   linkMapa,
   linkWhatsapp,
@@ -109,7 +109,7 @@ export function Confirmacao({ agendamento, barbearia }: Props) {
             <span>
               Ainda restam {agendamento.plano.restantes}{' '}
               {agendamento.plano.restantes === 1 ? 'corte' : 'cortes'} no seu plano, válido até{' '}
-              {diaMesDoInstante(agendamento.plano.expira_em)}.
+              {dataCurtaDoInstante(agendamento.plano.expira_em)}.
             </span>
           ) : (
             <span>Esse foi o último corte do seu plano. Renove na aba Clube!</span>

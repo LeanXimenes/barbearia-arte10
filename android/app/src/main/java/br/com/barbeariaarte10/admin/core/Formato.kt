@@ -112,13 +112,28 @@ object Formato {
         }.getOrDefault(iso)
     }
 
-    /** "29/10" de um instante do banco, no fuso da barbearia. */
+    /** "29/10" de um instante do banco; com o ano ("15/01/2027") se não for este ano. */
     fun diaMes(iso: String?): String {
         if (iso.isNullOrBlank()) return ""
         return runCatching {
             val momento = Instant.parse(iso).toLocalDateTime(FUSO)
-            "%02d/%02d".format(momento.dayOfMonth, momento.monthNumber)
+            if (momento.year == hoje().year) {
+                "%02d/%02d".format(momento.dayOfMonth, momento.monthNumber)
+            } else {
+                "%02d/%02d/%d".format(momento.dayOfMonth, momento.monthNumber, momento.year)
+            }
         }.getOrDefault("")
+    }
+
+    /** Prazo de um plano do jeito que se fala: 30 -> "1 mês", 90 -> "3 meses", 365 -> "1 ano". */
+    fun prazo(dias: Int): String {
+        fun plural(n: Int, um: String, varios: String) = "$n ${if (n == 1) um else varios}"
+        return when {
+            dias > 0 && dias % 365 == 0 -> plural(dias / 365, "ano", "anos")
+            dias > 0 && dias % 30 == 0 -> plural(dias / 30, "mês", "meses")
+            dias > 0 && dias % 7 == 0 -> plural(dias / 7, "semana", "semanas")
+            else -> plural(dias, "dia", "dias")
+        }
     }
 
     fun rotuloStatus(status: String?): String = when (status) {

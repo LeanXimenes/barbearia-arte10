@@ -140,3 +140,25 @@ export function diaMesDoInstante(iso: string, fuso = 'America/Sao_Paulo'): strin
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit' })
 }
+
+/**
+ * "29/10" se for neste ano; "29/01/2027" se for em outro ano (planos longos
+ * podem vencer no ano seguinte e "29/01" sozinho confundiria).
+ */
+export function dataCurtaDoInstante(
+  iso: string,
+  fuso = 'America/Sao_Paulo',
+  agora = new Date(),
+): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const ano = (x: Date) => x.toLocaleDateString('pt-BR', { timeZone: fuso, year: 'numeric' })
+  return ano(d) === ano(agora)
+    ? d.toLocaleDateString('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit' })
+    : d.toLocaleDateString('pt-BR', {
+        timeZone: fuso,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+}

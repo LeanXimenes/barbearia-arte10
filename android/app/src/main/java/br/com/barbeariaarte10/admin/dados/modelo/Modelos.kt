@@ -227,6 +227,7 @@ data class AssinaturaResumo(
     val preco: Double,
     @SerialName("cortes_total") val cortesTotal: Int,
     @SerialName("cortes_usados") val cortesUsados: Int,
+    @SerialName("validade_dias") val validadeDias: Int = 30,
     /** solicitada | ativa | encerrada | recusada | cancelada */
     val status: String,
     @SerialName("solicitada_em") val solicitadaEm: String,

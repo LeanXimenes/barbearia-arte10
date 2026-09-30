@@ -71,6 +71,17 @@ fun DialogoPlano(
                     Campo(cortes, { cortes = it.filter(Char::isDigit) }, "Cortes", KeyboardType.Number, Modifier.weight(1f))
                     Campo(dias, { dias = it.filter(Char::isDigit) }, "Validade (dias)", KeyboardType.Number, Modifier.weight(1f))
                 }
+                // Como vai aparecer no site: o plano é pago UMA vez e vale pelo prazo.
+                dias.toIntOrNull()?.takeIf { it in 1..365 }?.let { d ->
+                    Text(
+                        "No site: ${preco.toDoubleOrNull()?.let { Formato.moeda(it) } ?: "R$ —"} " +
+                            (if (d == 30) "/mês" else "por ${Formato.prazo(d)}") +
+                            ", pago uma vez. Confira se a frase de destaque combina com esse prazo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextoSuave,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 OutlinedTextField(
                     value = beneficios,
                     onValueChange = { beneficios = it },

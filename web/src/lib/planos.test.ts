@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { contaDoPlano, precoDoCorteDoPlano } from './planos'
+import {
+  contaDoPlano,
+  precoDoCorteDoPlano,
+  sufixoDoPreco,
+  textoValidade,
+  vantagensDoPlano,
+} from './planos'
 
 const corte = {
   id: '1',
@@ -40,5 +46,37 @@ describe('conta dos planos', () => {
   it('sem serviço marcado usa o valor guardado; sem economia não mostra', () => {
     expect(contaDoPlano({ preco: 110, cortes: 4, preco_referencia: 140 }, null).economia).toBe(30)
     expect(contaDoPlano({ preco: 200, cortes: 4, preco_referencia: null }, 35).economia).toBeNull()
+  })
+})
+
+describe('prazo do plano (pago uma vez)', () => {
+  it('escreve o prazo do jeito que se fala', () => {
+    expect(textoValidade(30)).toBe('1 mês')
+    expect(textoValidade(90)).toBe('3 meses')
+    expect(textoValidade(365)).toBe('1 ano')
+    expect(textoValidade(14)).toBe('2 semanas')
+    expect(textoValidade(10)).toBe('10 dias')
+    expect(textoValidade(1)).toBe('1 dia')
+  })
+
+  it('só 30 dias vira "/mês"; 90 dias não parece mensalidade', () => {
+    expect(sufixoDoPreco(30)).toBe('/mês')
+    expect(sufixoDoPreco(90)).toBe('por 3 meses')
+    expect(sufixoDoPreco(45)).toBe('por 45 dias')
+  })
+
+  it('vantagens calculadas substituem as escritas à mão que poderiam mentir', () => {
+    expect(
+      vantagensDoPlano({
+        cortes: 6,
+        validade_dias: 90,
+        beneficios: [
+          '4 cortes de cabelo',
+          'Válido por 30 dias',
+          'Economize R$ 30',
+          'Bebida grátis',
+        ],
+      }),
+    ).toEqual(['6 cortes de cabelo', 'Vale por 3 meses', 'Bebida grátis'])
   })
 })

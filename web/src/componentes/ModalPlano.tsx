@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Assinatura, ConfigBarbearia, Plano } from '../lib/tipos'
 import { lerCliente, salvarCliente } from '../lib/clienteSalvo'
+import { textoValidade } from '../lib/planos'
 import { solicitarPlano } from '../servicos/api'
 import {
   linkWhatsapp,
@@ -125,7 +126,8 @@ export function ModalPlano({ plano, config, aoFechar }: Props) {
                 <div className="revisao__linha">
                   <span className="revisao__rotulo">Cortes</span>
                   <span className="revisao__valor">
-                    {plano.cortes} em {plano.validade_dias} dias
+                    {plano.cortes} {plano.cortes === 1 ? 'corte' : 'cortes'} · vale{' '}
+                    {textoValidade(plano.validade_dias)}
                   </span>
                 </div>
                 <div className="revisao__linha">

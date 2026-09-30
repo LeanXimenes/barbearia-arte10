@@ -606,6 +606,7 @@ select
   s.preco,
   s.cortes_total,
   s.cortes_usados,
+  s.validade_dias,
   s.status,
   s.solicitada_em,
   s.ativada_em,

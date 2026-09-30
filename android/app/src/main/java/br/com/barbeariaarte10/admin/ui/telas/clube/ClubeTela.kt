@@ -295,7 +295,7 @@ fun ClubeTela(
                 Text(
                     if (ativar) {
                         "${a.clienteNome} pagou ${Formato.moeda(a.preco)} pelo ${a.planoNome}? " +
-                            "Os ${a.cortesTotal} cortes passam a valer por 30 dias a partir de agora."
+                            "Os ${a.cortesTotal} cortes passam a valer por ${Formato.prazo(a.validadeDias)} a partir de agora."
                     } else {
                         "${a.clienteNome} deixa de ter o ${a.planoNome}. Isso não pode ser desfeito."
                     },
@@ -433,7 +433,7 @@ private fun CartaoPlano(plano: Plano, precoCorte: Double?, aoEditar: () -> Unit)
                     color = if (plano.ativo) MaterialTheme.colorScheme.onBackground else TextoFraco,
                 )
                 Text(
-                    "${Formato.moeda(plano.preco)} · ${plano.cortes} cortes em ${plano.validadeDias} dias",
+                    "${Formato.moeda(plano.preco)} · ${plano.cortes} cortes · vale ${Formato.prazo(plano.validadeDias)} (pago uma vez)",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextoSuave,
                 )

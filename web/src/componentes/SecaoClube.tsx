@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { Assinatura, ConfigBarbearia, Plano, Servico } from '../lib/tipos'
-import { contaDoPlano, precoDoCorteDoPlano } from '../lib/planos'
+import { contaDoPlano, precoDoCorteDoPlano, sufixoDoPreco, vantagensDoPlano } from '../lib/planos'
 import { useClube } from '../hooks/useClube'
 import { lerCliente } from '../lib/clienteSalvo'
 import { consultarMeuPlano } from '../servicos/api'
-import { diaMesDoInstante, linkWhatsapp } from '../lib/formato'
+import { dataCurtaDoInstante, linkWhatsapp } from '../lib/formato'
 import { IconeAlerta, IconeCheck, IconeCoroa, IconeWhatsapp } from './Icones'
 import { ModalPlano } from './ModalPlano'
 
@@ -176,12 +176,12 @@ function CartaoPlano({
         <div className="plano__preco">
           <span className="plano__moeda">R$</span>
           <span className="plano__valor">{formatarInteiro(plano.preco)}</span>
-          <span className="plano__mes">/mês</span>
+          <span className="plano__mes">{sufixoDoPreco(plano.validade_dias)}</span>
         </div>
       </div>
 
       <ul className="plano__beneficios">
-        {plano.beneficios.map((b) => (
+        {vantagensDoPlano(plano).map((b) => (
           <li key={b}>
             <IconeCheck tamanho={13} /> {b}
           </li>
@@ -210,7 +210,7 @@ function MeuPlano({ plano }: { plano: Assinatura }) {
   let texto: string
   if (plano.status === 'ativa') {
     texto = `Seu ${plano.plano}: ${plano.restantes} de ${plano.cortes_total} cortes · até ${
-      plano.expira_em ? diaMesDoInstante(plano.expira_em) : ''
+      plano.expira_em ? dataCurtaDoInstante(plano.expira_em) : ''
     }`
   } else if (plano.status === 'solicitada') {
     texto = `Pedido do ${plano.plano} enviado. A barbearia vai confirmar o pagamento.`
