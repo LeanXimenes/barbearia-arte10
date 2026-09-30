@@ -46,8 +46,11 @@ fun DialogoPlano(
     precoCorte: Double?,
     salvando: Boolean,
     aoFechar: () -> Unit,
+    /** Só na edição. Se algum cliente já pegou o plano, o banco recusa e pede para esconder. */
+    aoExcluir: (() -> Unit)? = null,
     aoSalvar: (PlanoEdicao) -> Unit,
 ) {
+    var confirmarExclusao by remember { mutableStateOf(false) }
     var nome by remember { mutableStateOf(plano?.nome.orEmpty()) }
     var chamada by remember { mutableStateOf(plano?.chamada.orEmpty()) }
     var preco by remember { mutableStateOf(plano?.preco?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty()) }
@@ -115,6 +118,19 @@ fun DialogoPlano(
                 Spacer(Modifier.height(8.dp))
                 Chave("Selo \"Mais escolhido\"", destaque) { destaque = it }
                 Chave("Aparece no site", ativo) { ativo = it }
+
+                if (aoExcluir != null) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = { if (confirmarExclusao) aoExcluir() else confirmarExclusao = true },
+                        enabled = !salvando,
+                    ) {
+                        Text(
+                            if (confirmarExclusao) "Toque de novo para excluir de vez" else "Excluir este plano",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
 
                 erro?.let {
                     Spacer(Modifier.height(8.dp))

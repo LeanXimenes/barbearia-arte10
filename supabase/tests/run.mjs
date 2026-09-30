@@ -1531,6 +1531,44 @@ await teste('apagar tudo que já passou mantém os futuros e o plano como estava
   igual(usadosDepois.cortes_usados, usadosAntes.cortes_usados, 'mexeu no plano')
 })
 
+await teste('apagar cliente: só sem horário marcado e sem plano em aberto', async () => {
+  const comFuturo = await umaC(
+    `select c.id from public.clientes c join public.agendamentos a on a.cliente_id = c.id
+      where a.fim_em > now() and a.cancelado_em is null limit 1`
+  )
+  await lancaErro(() => anonC('select public.apagar_cliente($1)', [comFuturo.id]), 'permission denied')
+  igual((await donoC('select public.apagar_cliente($1) as r', [comFuturo.id])).r.erro, 'CLIENTE_TEM_HORARIO')
+
+  const semNada = await umaC(
+    `insert into public.clientes (nome, telefone) values ('Só Histórico', '17944445555') returning id`
+  )
+  const r = (await donoC('select public.apagar_cliente($1) as r', [semNada.id])).r
+  verdadeiro(r.ok, r.mensagem)
+  igual((await umaC('select count(*)::int as n from public.clientes where id = $1', [semNada.id])).n, 0)
+})
+
+await teste('planos encerrados podem ser excluídos; ativos e pedidos não', async () => {
+  const novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Fulano Plano', '17966667777'])).r
+  igual((await donoC('select public.excluir_assinatura($1) as r', [novo.assinatura.id])).r.erro, 'ASSINATURA_ESTADO')
+  await donoC('select public.encerrar_assinatura($1)', [novo.assinatura.id])
+  verdadeiro((await donoC('select public.excluir_assinatura($1) as r', [novo.assinatura.id])).r.ok)
+  const r = (await donoC('select public.excluir_assinaturas_encerradas() as r')).r
+  verdadeiro(r.ok, r.mensagem)
+  igual((await umaC("select count(*)::int as n from public.assinaturas where status not in ('solicitada','ativa')")).n, 0)
+})
+
+await teste('plano à venda: exclui se ninguém pegou; se já pegaram, pede para esconder', async () => {
+  const usado = await umaC('select plano_id from public.assinaturas limit 1')
+  if (usado) {
+    igual((await donoC('select public.excluir_plano($1) as r', [usado.plano_id])).r.erro, 'PLANO_EM_USO')
+  }
+  const livre = await umaC(
+    "insert into public.planos (nome, preco, cortes) values ('Plano Teste', 50, 1) returning id"
+  )
+  verdadeiro((await donoC('select public.excluir_plano($1) as r', [livre.id])).r.ok)
+  await lancaErro(() => anonC('select public.excluir_plano($1)', [livre.id]), 'permission denied')
+})
+
 await dbc.close()
 
 // =====================================================================

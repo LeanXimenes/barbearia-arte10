@@ -126,6 +126,28 @@ class CatalogoRepositorio {
             }
         }
 
+    /** Exclui um plano à venda (só se nenhum cliente pegou). */
+    suspend fun excluirPlano(id: String): Resultado<RespostaSimples> = rpcComId("excluir_plano", id)
+
+    /** Exclui do app um plano de cliente que já acabou. */
+    suspend fun excluirAssinatura(id: String): Resultado<RespostaSimples> = rpcComId("excluir_assinatura", id)
+
+    /** Exclui todos os planos de clientes que já acabaram. */
+    suspend fun excluirAssinaturasEncerradas(): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest.rpc("excluir_assinaturas_encerradas").decodeAs<RespostaSimples>()
+        }
+
+    /** Apaga o cliente (sem horário marcado nem plano em aberto) e o histórico dele. */
+    suspend fun apagarCliente(id: String): Resultado<RespostaSimples> = rpcComId("apagar_cliente", id)
+
+    private suspend fun rpcComId(funcao: String, id: String): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc(funcao, buildJsonObject { put("p_id", id) })
+                .decodeAs<RespostaSimples>()
+        }
+
     /** Pedidos e planos dos clientes, dos mais novos para os mais antigos. */
     suspend fun assinaturas(): Resultado<List<AssinaturaResumo>> = executar {
         supabase.from("assinaturas_resumo")

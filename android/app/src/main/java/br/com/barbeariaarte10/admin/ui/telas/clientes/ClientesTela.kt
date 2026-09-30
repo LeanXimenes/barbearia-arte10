@@ -1,5 +1,17 @@
 package br.com.barbeariaarte10.admin.ui.telas.clientes
 
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import br.com.barbeariaarte10.admin.ui.tema.AzulNoite
+import br.com.barbeariaarte10.admin.ui.tema.Erro
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,6 +68,8 @@ data class EstadoClientes(
     val busca: String = "",
     val clientes: List<ClienteResumo> = emptyList(),
     val erro: String? = null,
+    val processando: Boolean = false,
+    val aviso: String? = null,
 )
 
 @OptIn(FlowPreview::class)
@@ -79,6 +93,29 @@ class ClientesViewModel : ViewModel() {
 
     fun recarregar() = buscar(_estado.value.busca)
 
+    fun limparAviso() = _estado.update { it.copy(aviso = null) }
+
+    /** Apaga o cliente e o histórico dele (o banco recusa se tiver horário ou plano em aberto). */
+    fun apagar(cliente: ClienteResumo) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            when (val r = Grafo.catalogo.apagarCliente(cliente.id)) {
+                is Resultado.Sucesso -> {
+                    val ok = r.dado.ok
+                    _estado.update {
+                        it.copy(
+                            processando = false,
+                            clientes = if (ok) it.clientes.filterNot { c -> c.id == cliente.id } else it.clientes,
+                            aviso = if (ok) "${cliente.nome} foi apagado." else r.dado.mensagem,
+                        )
+                    }
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
+
     private fun buscar(texto: String) {
         _estado.update { it.copy(carregando = true, erro = null) }
 
@@ -101,6 +138,7 @@ fun ClientesTela(
     modelo: ClientesViewModel = viewModel(),
 ) {
     val estado by modelo.estado.collectAsStateWithLifecycle()
+    var apagando by remember { mutableStateOf<ClienteResumo?>(null) }
 
     LaunchedEffect(online) { if (online) modelo.recarregar() }
 
@@ -121,6 +159,15 @@ fun ClientesTela(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             )
+        }
+
+        estado.aviso?.let { aviso ->
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(aviso, style = MaterialTheme.typography.bodySmall, color = Ouro, modifier = Modifier.weight(1f))
+                    TextButton(onClick = modelo::limparAviso) { Text("OK", color = Ouro) }
+                }
+            }
         }
 
         if (estado.erro != null) {
@@ -145,13 +192,44 @@ fun ClientesTela(
         }
 
         items(estado.clientes, key = { it.id }) { cliente ->
-            CartaoCliente(cliente)
+            CartaoCliente(
+                cliente = cliente,
+                // Com horário marcado não dá: primeiro cancela o horário.
+                aoApagar = if (cliente.proximoHorario == null && !estado.processando) ({ apagando = cliente }) else null,
+            )
         }
+    }
+
+    apagando?.let { cliente ->
+        AlertDialog(
+            onDismissRequest = { apagando = null },
+            containerColor = AzulNoite,
+            title = { Text("Apagar ${cliente.nome}?") },
+            text = {
+                Text(
+                    "Some da lista de clientes junto com as visitas antigas. " +
+                        "Se ele agendar de novo pelo site, volta como cliente novo. Não pode ser desfeito.",
+                    color = TextoSuave,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        modelo.apagar(cliente)
+                        apagando = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Erro, contentColor = Color.White),
+                ) { Text("Apagar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { apagando = null }) { Text("Voltar", color = TextoSuave) }
+            },
+        )
     }
 }
 
 @Composable
-private fun CartaoCliente(cliente: ClienteResumo) {
+private fun CartaoCliente(cliente: ClienteResumo, aoApagar: (() -> Unit)?) {
     CartaoArte10 {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -172,6 +250,11 @@ private fun CartaoCliente(cliente: ClienteResumo) {
                         if (cliente.totalAgendamentos == 1) "" else "s",
                     cor = Ouro,
                 )
+                if (aoApagar != null) {
+                    IconButton(onClick = aoApagar) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Apagar ${cliente.nome}", tint = TextoFraco)
+                    }
+                }
             }
 
             if (cliente.proximoHorario != null) {

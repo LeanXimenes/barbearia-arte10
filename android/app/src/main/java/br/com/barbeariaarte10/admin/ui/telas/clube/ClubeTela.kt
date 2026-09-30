@@ -136,6 +136,34 @@ class ClubeViewModel : ViewModel() {
         Grafo.catalogo.encerrarAssinatura(a.id)
     }
 
+    /** Exclui do app um plano de cliente que já acabou. */
+    fun excluir(a: AssinaturaResumo) = executar("Plano de ${a.clienteNome} excluído.") {
+        Grafo.catalogo.excluirAssinatura(a.id)
+    }
+
+    /** Exclui todos os planos de clientes que já acabaram. */
+    fun limparEncerrados() = executar("Planos encerrados excluídos.") {
+        Grafo.catalogo.excluirAssinaturasEncerradas()
+    }
+
+    /** Exclui um plano à venda (o banco recusa se algum cliente já pegou). */
+    fun excluirPlano(plano: Plano, aoTerminar: () -> Unit) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            when (val r = Grafo.catalogo.excluirPlano(plano.id)) {
+                is Resultado.Sucesso -> {
+                    _estado.update {
+                        it.copy(processando = false, aviso = if (r.dado.ok) "${plano.nome} excluído." else r.dado.mensagem)
+                    }
+                    carregar()
+                    aoTerminar()
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
+
     private fun executar(
         sucesso: String,
         chamada: suspend () -> Resultado<br.com.barbeariaarte10.admin.dados.modelo.RespostaSimples>,
@@ -170,6 +198,7 @@ fun ClubeTela(
     var confirmando by remember { mutableStateOf<Pair<AssinaturaResumo, Boolean>?>(null) }
     var editandoPlano by remember { mutableStateOf<Plano?>(null) }
     var criandoPlano by remember { mutableStateOf(false) }
+    var limpandoEncerrados by remember { mutableStateOf(false) }
 
     LaunchedEffect(online) { if (online) modelo.carregar() }
 
@@ -252,9 +281,26 @@ fun ClubeTela(
         }
 
         if (estado.encerrados.isNotEmpty()) {
-            item { Subtitulo("Encerrados") }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Subtitulo("Encerrados")
+                    Spacer(Modifier.weight(1f))
+                    TextButton(
+                        onClick = { limpandoEncerrados = true },
+                        enabled = !estado.processando,
+                        modifier = Modifier.padding(top = 10.dp),
+                    ) {
+                        Text("Excluir todos", color = Erro)
+                    }
+                }
+            }
             items(estado.encerrados, key = { it.id }) { a ->
-                CartaoAssinatura(a = a, processando = estado.processando, aoAtivar = null, aoEncerrar = null)
+                CartaoAssinatura(
+                    a = a,
+                    processando = estado.processando,
+                    aoAtivar = null,
+                    aoEncerrar = { confirmando = a to false },
+                )
             }
         }
     }
@@ -269,6 +315,14 @@ fun ClubeTela(
                 criandoPlano = false
                 editandoPlano = null
             },
+            aoExcluir = editandoPlano?.let { plano ->
+                {
+                    modelo.excluirPlano(plano) {
+                        criandoPlano = false
+                        editandoPlano = null
+                    }
+                }
+            },
             aoSalvar = { dados ->
                 modelo.salvarPlano(editandoPlano?.id, dados) {
                     criandoPlano = false
@@ -278,7 +332,35 @@ fun ClubeTela(
         )
     }
 
+    if (limpandoEncerrados) {
+        AlertDialog(
+            onDismissRequest = { limpandoEncerrados = false },
+            containerColor = AzulNoite,
+            title = { Text("Excluir os planos encerrados?") },
+            text = {
+                Text(
+                    "Some da lista todo plano que já acabou, foi cancelado ou recusado. " +
+                        "Planos ativos e pedidos continuam. Não pode ser desfeito.",
+                    color = TextoSuave,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        modelo.limparEncerrados()
+                        limpandoEncerrados = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Erro, contentColor = Color.White),
+                ) { Text("Excluir") }
+            },
+            dismissButton = {
+                TextButton(onClick = { limpandoEncerrados = false }) { Text("Voltar", color = TextoSuave) }
+            },
+        )
+    }
+
     confirmando?.let { (a, ativar) ->
+        val aberto = a.status == "solicitada" || a.status == "ativa"
         AlertDialog(
             onDismissRequest = { confirmando = null },
             containerColor = AzulNoite,
@@ -287,7 +369,8 @@ fun ClubeTela(
                     when {
                         ativar -> "Confirmar pagamento?"
                         a.status == "solicitada" -> "Recusar o pedido?"
-                        else -> "Cancelar o plano?"
+                        aberto -> "Cancelar o plano?"
+                        else -> "Excluir do app?"
                     },
                 )
             },
@@ -296,8 +379,10 @@ fun ClubeTela(
                     if (ativar) {
                         "${a.clienteNome} pagou ${Formato.moeda(a.preco)} pelo ${a.planoNome}? " +
                             "Os ${a.cortesTotal} cortes passam a valer por ${Formato.prazo(a.validadeDias)} a partir de agora."
-                    } else {
+                    } else if (aberto) {
                         "${a.clienteNome} deixa de ter o ${a.planoNome}. Isso não pode ser desfeito."
+                    } else {
+                        "O ${a.planoNome} de ${a.clienteNome}, que já acabou, some da lista."
                     },
                     color = TextoSuave,
                 )
@@ -305,7 +390,11 @@ fun ClubeTela(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (ativar) modelo.ativar(a) else modelo.encerrar(a)
+                        when {
+                            ativar -> modelo.ativar(a)
+                            aberto -> modelo.encerrar(a)
+                            else -> modelo.excluir(a)
+                        }
                         confirmando = null
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -413,7 +502,13 @@ private fun CartaoAssinatura(
                             shape = RoundedCornerShape(999.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Erro),
                         ) {
-                            Text(if (a.status == "solicitada") "Recusar" else "Cancelar plano")
+                            Text(
+                                when (a.status) {
+                                    "solicitada" -> "Recusar"
+                                    "ativa" -> "Cancelar plano"
+                                    else -> "Excluir do app"
+                                },
+                            )
                         }
                     }
                 }
