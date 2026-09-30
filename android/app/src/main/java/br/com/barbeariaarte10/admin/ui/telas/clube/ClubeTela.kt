@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +47,8 @@ import br.com.barbeariaarte10.admin.Grafo
 import br.com.barbeariaarte10.admin.core.Formato
 import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.dados.modelo.AssinaturaResumo
+import br.com.barbeariaarte10.admin.dados.modelo.Plano
+import br.com.barbeariaarte10.admin.dados.modelo.PlanoEdicao
 import br.com.barbeariaarte10.admin.ui.componentes.CartaoArte10
 import br.com.barbeariaarte10.admin.ui.componentes.EstadoVazio
 import br.com.barbeariaarte10.admin.ui.componentes.Etiqueta
@@ -65,6 +69,9 @@ import kotlinx.coroutines.launch
 data class EstadoClube(
     val carregando: Boolean = true,
     val assinaturas: List<AssinaturaResumo> = emptyList(),
+    val planos: List<Plano> = emptyList(),
+    /** Preço do serviço que desconta do plano: base da conta de economia. */
+    val precoCorte: Double? = null,
     val erro: String? = null,
     val processando: Boolean = false,
     val aviso: String? = null,
@@ -84,6 +91,13 @@ class ClubeViewModel : ViewModel() {
     fun carregar() {
         _estado.update { it.copy(carregando = true, erro = null) }
         viewModelScope.launch {
+            val planos = Grafo.catalogo.planos()
+            if (planos is Resultado.Sucesso) _estado.update { it.copy(planos = planos.dado) }
+            val servicos = Grafo.catalogo.servicos()
+            if (servicos is Resultado.Sucesso) {
+                val corte = servicos.dado.firstOrNull { it.usaPlano && it.ativo } ?: servicos.dado.firstOrNull { it.usaPlano }
+                _estado.update { it.copy(precoCorte = corte?.preco) }
+            }
             when (val r = Grafo.catalogo.assinaturas()) {
                 is Resultado.Sucesso -> _estado.update {
                     it.copy(carregando = false, assinaturas = r.dado, erro = null)
@@ -94,6 +108,23 @@ class ClubeViewModel : ViewModel() {
     }
 
     fun limparAviso() = _estado.update { it.copy(aviso = null) }
+
+    /** Cria (id nulo) ou edita um plano à venda. */
+    fun salvarPlano(id: String?, dados: PlanoEdicao, aoTerminar: () -> Unit) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            val r = if (id == null) Grafo.catalogo.criarPlano(dados) else Grafo.catalogo.atualizarPlano(id, dados)
+            when (r) {
+                is Resultado.Sucesso -> {
+                    _estado.update { it.copy(processando = false, aviso = "Plano salvo. Já aparece assim no site.") }
+                    carregar()
+                    aoTerminar()
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
 
     fun ativar(a: AssinaturaResumo) = executar("Plano de ${a.clienteNome} ativado!") {
         Grafo.catalogo.ativarAssinatura(a.id)
@@ -137,6 +168,8 @@ fun ClubeTela(
 ) {
     val estado by modelo.estado.collectAsStateWithLifecycle()
     var confirmando by remember { mutableStateOf<Pair<AssinaturaResumo, Boolean>?>(null) }
+    var editandoPlano by remember { mutableStateOf<Plano?>(null) }
+    var criandoPlano by remember { mutableStateOf(false) }
 
     LaunchedEffect(online) { if (online) modelo.carregar() }
 
@@ -167,6 +200,22 @@ fun ClubeTela(
 
         estado.erro?.let { erro ->
             item { MensagemErro(mensagem = erro, aoTentarNovamente = modelo::carregar) }
+        }
+
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Subtitulo("Planos à venda no site")
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { criandoPlano = true }, modifier = Modifier.padding(top = 10.dp)) {
+                    Icon(Icons.Outlined.Add, contentDescription = null, tint = Ouro)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Novo plano", color = Ouro)
+                }
+            }
+        }
+
+        items(estado.planos, key = { "plano-${it.id}" }) { plano ->
+            CartaoPlano(plano = plano, precoCorte = estado.precoCorte, aoEditar = { editandoPlano = plano })
         }
 
         if (!estado.carregando && estado.erro == null && estado.assinaturas.isEmpty()) {
@@ -208,6 +257,25 @@ fun ClubeTela(
                 CartaoAssinatura(a = a, processando = estado.processando, aoAtivar = null, aoEncerrar = null)
             }
         }
+    }
+
+    if (criandoPlano || editandoPlano != null) {
+        DialogoPlano(
+            plano = editandoPlano,
+            proximaOrdem = (estado.planos.maxOfOrNull { it.ordem } ?: 0) + 1,
+            precoCorte = estado.precoCorte,
+            salvando = estado.processando,
+            aoFechar = {
+                criandoPlano = false
+                editandoPlano = null
+            },
+            aoSalvar = { dados ->
+                modelo.salvarPlano(editandoPlano?.id, dados) {
+                    criandoPlano = false
+                    editandoPlano = null
+                }
+            },
+        )
     }
 
     confirmando?.let { (a, ativar) ->
@@ -349,6 +417,46 @@ private fun CartaoAssinatura(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartaoPlano(plano: Plano, precoCorte: Double?, aoEditar: () -> Unit) {
+    CartaoArte10(corDaBorda = if (plano.destaque) Ouro.copy(alpha = 0.45f) else Color(0x1F9AA8C6)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    plano.nome,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (plano.ativo) MaterialTheme.colorScheme.onBackground else TextoFraco,
+                )
+                Text(
+                    "${Formato.moeda(plano.preco)} · ${plano.cortes} cortes em ${plano.validadeDias} dias",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextoSuave,
+                )
+                precoCorte?.let { unitario ->
+                    val economia = unitario * plano.cortes - plano.preco
+                    if (economia > 0) {
+                        Text(
+                            "Economia de ${Formato.moeda(economia)} (avulso ${Formato.moeda(unitario * plano.cortes)})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Sucesso,
+                        )
+                    }
+                }
+                if (!plano.ativo) {
+                    Spacer(Modifier.height(6.dp))
+                    Etiqueta(texto = "Escondido do site", cor = TextoFraco)
+                } else if (plano.destaque) {
+                    Spacer(Modifier.height(6.dp))
+                    Etiqueta(texto = "Mais escolhido", cor = Ouro)
+                }
+            }
+            IconButton(onClick = aoEditar) {
+                Icon(Icons.Outlined.Edit, contentDescription = "Editar ${plano.nome}", tint = TextoSuave)
             }
         }
     }

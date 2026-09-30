@@ -39,6 +39,7 @@ as $$
     when 'ATENDIMENTO_NAO_COMECOU' then 'Só dá para registrar o atendimento depois do horário marcado.'
     when 'MUITAS_TENTATIVAS'    then 'Muitos agendamentos em pouco tempo. Tente novamente em alguns minutos.'
     when 'AGENDAMENTO_JA_CANCELADO' then 'Esse agendamento já foi cancelado.'
+    when 'ATENDIMENTO_NAO_PASSOU' then 'Só dá para apagar depois que o horário passou.'
     when 'CANCELAMENTO_TARDE'   then 'Só dá para cancelar antes do horário marcado.'
     when 'PLANO_INDISPONIVEL'   then 'Esse plano não está disponível no momento.'
     when 'PLANO_JA_ATIVO'       then 'Você já tem um plano ativo. Use os cortes dele antes de pegar outro.'

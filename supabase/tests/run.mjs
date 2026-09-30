@@ -1489,6 +1489,48 @@ await teste('o dono muda a ordem dos serviços (e o site segue essa ordem)', asy
   igual((await donoC('select public.reordenar_servicos($1::uuid[]) as r', [repetido])).r.erro, 'SERVICOS_INVALIDOS')
 })
 
+await teste('o dono apaga quem já passou pela cadeira, mas nunca um horário futuro', async () => {
+  const passado = await umaC(
+    `select a.id from public.agendamentos a
+      where a.fim_em <= now() and a.cancelado_em is null limit 1`
+  )
+  const futuro = await umaC(
+    `select a.id from public.agendamentos a join public.plano_usos u on u.agendamento_id = a.id
+      where a.fim_em > now() limit 1`
+  )
+  await lancaErro(() => anonC('select public.apagar_atendimento($1)', [passado.id]), 'permission denied')
+  igual((await donoC('select public.apagar_atendimento($1) as r', [futuro.id])).r.erro, 'ATENDIMENTO_NAO_PASSOU')
+  // Mesmo com a marca ligada, horário futuro não sai.
+  await lancaErro(
+    () => dbc.exec(
+      `select set_config('arte10.apagar_atendimento', 'sim', false);
+       delete from public.agendamentos where id = '${futuro.id}'`
+    ),
+    'AGENDAMENTO_IMUTAVEL'
+  )
+  await dbc.query("select set_config('arte10.apagar_atendimento', '', false)")
+
+  const r = (await donoC('select public.apagar_atendimento($1) as r', [passado.id])).r
+  verdadeiro(r.ok, r.mensagem)
+  igual((await umaC('select count(*)::int as n from public.agendamentos where id = $1', [passado.id])).n, 0)
+  // Sem a função, continua proibido apagar.
+  const outro = await umaC('select id from public.agendamentos where cancelado_em is not null limit 1')
+  await lancaErro(() => dbc.query('delete from public.agendamentos where id = $1', [outro.id]), 'AGENDAMENTO_IMUTAVEL')
+})
+
+await teste('apagar tudo que já passou mantém os futuros e o plano como estava', async () => {
+  const usadosAntes = await umaC("select cortes_usados from public.assinaturas where status = 'encerrada'")
+  const futurosAntes = await umaC('select count(*)::int as n from public.agendamentos where fim_em > now() and cancelado_em is null')
+  const r = (await donoC('select public.apagar_atendimentos_passados() as r')).r
+  verdadeiro(r.ok && r.apagados >= 1, JSON.stringify(r))
+  const sobra = await umaC('select count(*)::int as n from public.agendamentos where fim_em <= now() or cancelado_em is not null')
+  igual(sobra.n, 0)
+  const futurosDepois = await umaC('select count(*)::int as n from public.agendamentos where fim_em > now() and cancelado_em is null')
+  igual(futurosDepois.n, futurosAntes.n, 'apagou horário futuro')
+  const usadosDepois = await umaC("select cortes_usados from public.assinaturas where status = 'encerrada'")
+  igual(usadosDepois.cortes_usados, usadosAntes.cortes_usados, 'mexeu no plano')
+})
+
 await dbc.close()
 
 // =====================================================================

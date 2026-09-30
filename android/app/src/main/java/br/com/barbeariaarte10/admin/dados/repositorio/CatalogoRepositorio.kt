@@ -9,6 +9,8 @@ import br.com.barbeariaarte10.admin.dados.modelo.AssinaturaResumo
 import br.com.barbeariaarte10.admin.dados.modelo.ClienteResumo
 import br.com.barbeariaarte10.admin.dados.modelo.ConfigBarbearia
 import br.com.barbeariaarte10.admin.dados.modelo.HorarioFuncionamento
+import br.com.barbeariaarte10.admin.dados.modelo.Plano
+import br.com.barbeariaarte10.admin.dados.modelo.PlanoEdicao
 import br.com.barbeariaarte10.admin.dados.modelo.RespostaSimples
 import br.com.barbeariaarte10.admin.dados.modelo.Servico
 import br.com.barbeariaarte10.admin.dados.modelo.ServicoEdicao
@@ -87,6 +89,42 @@ class CatalogoRepositorio {
         }
 
     // ------------------------------------------------ Clube Arte 10
+
+    /** Planos à venda (ativos e inativos), na ordem do site. */
+    suspend fun planos(): Resultado<List<Plano>> = executar {
+        supabase.from("planos")
+            .select {
+                order("ordem", Order.ASCENDING)
+                order("preco", Order.ASCENDING)
+            }
+            .decodeList<Plano>()
+    }
+
+    suspend fun criarPlano(plano: PlanoEdicao): Resultado<Unit> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.from("planos").insert(plano)
+        }
+
+    suspend fun atualizarPlano(id: String, plano: PlanoEdicao): Resultado<Unit> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            // Campo a campo, com null explícito, para apagar um texto de verdade.
+            supabase.from("planos").update(
+                {
+                    set("nome", plano.nome)
+                    set("chamada", plano.chamada)
+                    set("preco", plano.preco)
+                    set("preco_referencia", plano.precoReferencia)
+                    set("cortes", plano.cortes)
+                    set("validade_dias", plano.validadeDias)
+                    set("beneficios", plano.beneficios)
+                    set("destaque", plano.destaque)
+                    set("ativo", plano.ativo)
+                    set("ordem", plano.ordem)
+                },
+            ) {
+                filter { eq("id", id) }
+            }
+        }
 
     /** Pedidos e planos dos clientes, dos mais novos para os mais antigos. */
     suspend fun assinaturas(): Resultado<List<AssinaturaResumo>> = executar {

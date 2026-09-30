@@ -21,7 +21,7 @@ create table if not exists public.planos (
   nome             text           not null,
   chamada          text,                        -- ex.: "4 cortes no mês por apenas R$ 110!"
   preco            numeric(10, 2) not null,
-  preco_referencia numeric(10, 2),              -- quanto custaria avulso ("de R$ 140")
+  preco_referencia numeric(10, 2),              -- reserva: o site calcula pelo preço do corte
   cortes           integer        not null,
   validade_dias    integer        not null default 30,
   beneficios       text[]         not null default '{}',
@@ -712,7 +712,7 @@ select * from (values
   ('Plano Classic', null::text, 65.00, 70.00, 2, 30,
    array['2 cortes de cabelo', 'Válido por 30 dias'], false, 1),
   ('Plano Elite', '4 cortes no mês por apenas R$ 110!', 110.00, 140.00, 4, 30,
-   array['4 cortes de cabelo', 'Economize R$ 30', 'Válido por 30 dias'], true, 2)
+   array['4 cortes de cabelo', 'Válido por 30 dias'], true, 2)
 ) v(nome, chamada, preco, preco_referencia, cortes, validade_dias, beneficios, destaque, ordem)
 where not exists (select 1 from public.planos);
 

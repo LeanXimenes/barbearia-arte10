@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { Assinatura, ConfigBarbearia, Plano } from '../lib/tipos'
+import type { Assinatura, ConfigBarbearia, Plano, Servico } from '../lib/tipos'
+import { contaDoPlano, precoDoCorteDoPlano } from '../lib/planos'
 import { useClube } from '../hooks/useClube'
 import { lerCliente } from '../lib/clienteSalvo'
 import { consultarMeuPlano } from '../servicos/api'
@@ -9,11 +10,14 @@ import { ModalPlano } from './ModalPlano'
 
 interface Props {
   config: ConfigBarbearia | null
+  /** Serviços do site: o preço do corte é a base da conta de economia. */
+  servicos: Servico[]
 }
 
 type Visao = 'planos' | 'promocoes'
 
-export function SecaoClube({ config }: Props) {
+export function SecaoClube({ config, servicos }: Props) {
+  const precoCorte = precoDoCorteDoPlano(servicos)
   const { planos, promocoes, carregando, erro, recarregar } = useClube()
   const [visao, setVisao] = useState<Visao>('planos')
   const [escolhido, setEscolhido] = useState<Plano | null>(null)
@@ -80,7 +84,12 @@ export function SecaoClube({ config }: Props) {
             <p className="clube__vazio">Nenhum plano disponível no momento.</p>
           )}
           {planos.map((plano) => (
-            <CartaoPlano key={plano.id} plano={plano} aoQuerer={() => setEscolhido(plano)} />
+            <CartaoPlano
+              key={plano.id}
+              plano={plano}
+              precoCorte={precoCorte}
+              aoQuerer={() => setEscolhido(plano)}
+            />
           ))}
         </div>
       )}
@@ -141,11 +150,16 @@ export function SecaoClube({ config }: Props) {
   )
 }
 
-function CartaoPlano({ plano, aoQuerer }: { plano: Plano; aoQuerer: () => void }) {
-  const economia =
-    plano.preco_referencia !== null && plano.preco_referencia > plano.preco
-      ? plano.preco_referencia - plano.preco
-      : null
+function CartaoPlano({
+  plano,
+  precoCorte,
+  aoQuerer,
+}: {
+  plano: Plano
+  precoCorte: number | null
+  aoQuerer: () => void
+}) {
+  const { avulso, economia } = contaDoPlano(plano, precoCorte)
 
   return (
     <article className={`cartao plano ${plano.destaque ? 'plano--destaque' : ''}`}>
@@ -175,10 +189,9 @@ function CartaoPlano({ plano, aoQuerer }: { plano: Plano; aoQuerer: () => void }
       </ul>
 
       <div className="plano__rodape">
-        {economia !== null && plano.preco_referencia !== null && (
+        {economia !== null && avulso !== null && (
           <span className="plano__economia">
-            <s>R$ {formatarInteiro(plano.preco_referencia)}</s> Economia de R${' '}
-            {formatarInteiro(economia)}
+            <s>R$ {formatarInteiro(avulso)}</s> Economia de R$ {formatarInteiro(economia)}
           </span>
         )}
         <button

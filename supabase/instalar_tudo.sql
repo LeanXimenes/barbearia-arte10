@@ -430,6 +430,12 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE' then
+    -- Única exceção: apagar_atendimento(s), pelo dono, de horário que já
+    -- passou (ou foi cancelado). A função liga esta marca só na transação dela.
+    if coalesce(current_setting('arte10.apagar_atendimento', true), '') = 'sim'
+       and (old.fim_em <= now() or old.cancelado_em is not null) then
+      return old;
+    end if;
     raise exception 'AGENDAMENTO_IMUTAVEL'
       using detail  = 'Agendamentos de clientes nao podem ser excluidos.',
             errcode = 'check_violation';
@@ -716,6 +722,7 @@ as $$
     when 'ATENDIMENTO_NAO_COMECOU' then 'Só dá para registrar o atendimento depois do horário marcado.'
     when 'MUITAS_TENTATIVAS'    then 'Muitos agendamentos em pouco tempo. Tente novamente em alguns minutos.'
     when 'AGENDAMENTO_JA_CANCELADO' then 'Esse agendamento já foi cancelado.'
+    when 'ATENDIMENTO_NAO_PASSOU' then 'Só dá para apagar depois que o horário passou.'
     when 'CANCELAMENTO_TARDE'   then 'Só dá para cancelar antes do horário marcado.'
     when 'PLANO_INDISPONIVEL'   then 'Esse plano não está disponível no momento.'
     when 'PLANO_JA_ATIVO'       then 'Você já tem um plano ativo. Use os cortes dele antes de pegar outro.'
@@ -2360,7 +2367,7 @@ create table if not exists public.planos (
   nome             text           not null,
   chamada          text,                        -- ex.: "4 cortes no mês por apenas R$ 110!"
   preco            numeric(10, 2) not null,
-  preco_referencia numeric(10, 2),              -- quanto custaria avulso ("de R$ 140")
+  preco_referencia numeric(10, 2),              -- reserva: o site calcula pelo preço do corte
   cortes           integer        not null,
   validade_dias    integer        not null default 30,
   beneficios       text[]         not null default '{}',
@@ -3051,7 +3058,7 @@ select * from (values
   ('Plano Classic', null::text, 65.00, 70.00, 2, 30,
    array['2 cortes de cabelo', 'Válido por 30 dias'], false, 1),
   ('Plano Elite', '4 cortes no mês por apenas R$ 110!', 110.00, 140.00, 4, 30,
-   array['4 cortes de cabelo', 'Economize R$ 30', 'Válido por 30 dias'], true, 2)
+   array['4 cortes de cabelo', 'Válido por 30 dias'], true, 2)
 ) v(nome, chamada, preco, preco_referencia, cortes, validade_dias, beneficios, destaque, ordem)
 where not exists (select 1 from public.planos);
 
@@ -3075,6 +3082,99 @@ update public.servicos
    set usa_plano = true
  where lower(btrim(nome)) in ('corte de cabelo', 'corte')
    and not exists (select 1 from public.servicos where usa_plano);
+
+-- >>>>>>>>>> 20260101001100_apagar_atendimentos.sql
+-- =====================================================================
+-- BARBEARIA ARTE 10 — 11. Apagar quem já passou pela cadeira
+-- =====================================================================
+-- O dono pode limpar do app os atendimentos que JÁ ACONTECERAM (ou que
+-- foram cancelados). Horário futuro de cliente continua intocável: para
+-- esse, só existe o cancelamento.
+--
+-- Se o atendimento usou plano, o corte continua contado como usado.
+-- O cadastro do cliente (nome e telefone) não é apagado.
+-- =====================================================================
+
+create or replace function public.apagar_agendamentos_internos(p_ids uuid[])
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_qtd integer;
+begin
+  -- Libera o gatilho de imutabilidade só nesta transação.
+  perform set_config('arte10.apagar_atendimento', 'sim', true);
+
+  delete from public.notificacoes where agendamento_id = any (p_ids);
+  delete from public.plano_usos   where agendamento_id = any (p_ids);
+  delete from public.agendamentos where id = any (p_ids);
+  get diagnostics v_qtd = row_count;
+
+  perform set_config('arte10.apagar_atendimento', '', true);
+  return v_qtd;
+end;
+$$;
+
+-- Apaga um atendimento que já passou (ou foi cancelado).
+create or replace function public.apagar_atendimento(p_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_a public.agendamentos%rowtype;
+begin
+  if not public.is_admin() then
+    return public.resposta_erro('NAO_AUTORIZADO');
+  end if;
+
+  select * into v_a from public.agendamentos where id = p_id for update;
+  if not found then
+    return public.resposta_erro('AGENDAMENTO_NAO_ENCONTRADO');
+  end if;
+  if v_a.fim_em > now() and v_a.cancelado_em is null then
+    return public.resposta_erro('ATENDIMENTO_NAO_PASSOU');
+  end if;
+
+  perform public.apagar_agendamentos_internos(array[p_id]);
+  return jsonb_build_object('ok', true, 'apagados', 1);
+end;
+$$;
+
+-- Apaga de uma vez todos os atendimentos que já passaram (e os cancelados).
+create or replace function public.apagar_atendimentos_passados()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_ids uuid[];
+begin
+  if not public.is_admin() then
+    return public.resposta_erro('NAO_AUTORIZADO');
+  end if;
+
+  select coalesce(array_agg(a.id), '{}')
+    into v_ids
+    from public.agendamentos a
+   where a.fim_em <= now() or a.cancelado_em is not null;
+
+  return jsonb_build_object(
+    'ok', true,
+    'apagados', public.apagar_agendamentos_internos(v_ids)
+  );
+end;
+$$;
+
+revoke all on function public.apagar_agendamentos_internos(uuid[]) from public, anon, authenticated;
+revoke all on function public.apagar_atendimento(uuid)             from public, anon;
+revoke all on function public.apagar_atendimentos_passados()       from public, anon;
+grant execute on function public.apagar_atendimento(uuid)       to authenticated;
+grant execute on function public.apagar_atendimentos_passados() to authenticated;
 
 -- >>>>>>>>>> seed.sql
 -- =====================================================================

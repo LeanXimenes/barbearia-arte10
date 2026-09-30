@@ -19,6 +19,12 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE' then
+    -- Única exceção: apagar_atendimento(s), pelo dono, de horário que já
+    -- passou (ou foi cancelado). A função liga esta marca só na transação dela.
+    if coalesce(current_setting('arte10.apagar_atendimento', true), '') = 'sim'
+       and (old.fim_em <= now() or old.cancelado_em is not null) then
+      return old;
+    end if;
     raise exception 'AGENDAMENTO_IMUTAVEL'
       using detail  = 'Agendamentos de clientes nao podem ser excluidos.',
             errcode = 'check_violation';

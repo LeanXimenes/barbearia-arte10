@@ -23,7 +23,7 @@ interface Props {
   aoTrocarAba: (indice: number) => void
 }
 
-/** Abas no rodapé, só no celular (no computador elas ficam no cabeçalho). */
+/** Abas logo abaixo do cabeçalho, só no celular (no computador ficam no cabeçalho). */
 export function BarraAbas({ aba, total, aoTrocarAba }: Props) {
   return (
     <nav className="barra-abas" aria-label="Seções do site">

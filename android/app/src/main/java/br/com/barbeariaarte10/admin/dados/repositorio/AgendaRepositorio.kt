@@ -127,6 +127,22 @@ class AgendaRepositorio {
                 .decodeAs<RespostaSimples>()
         }
 
+    /** Apaga do app um atendimento que já passou (ou foi cancelado). */
+    suspend fun apagarAtendimento(agendamentoId: String): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc("apagar_atendimento", buildJsonObject { put("p_id", agendamentoId) })
+                .decodeAs<RespostaSimples>()
+        }
+
+    /** Apaga de uma vez todos os atendimentos que já passaram. Horários futuros ficam. */
+    suspend fun apagarAtendimentosPassados(): Resultado<RespostaSimples> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.postgrest
+                .rpc("apagar_atendimentos_passados")
+                .decodeAs<RespostaSimples>()
+        }
+
     /** Histórico completo, do mais recente para o mais antigo (item 28). */
     suspend fun historico(
         ate: LocalDate,
@@ -137,7 +153,7 @@ class AgendaRepositorio {
             .select(
                 Columns.raw(
                     "id, data, horario_inicio, horario_fim, status, servico_nome, " +
-                        "servico_preco, servico_duracao, created_at, cancelado_em, clientes(nome, telefone)"
+                        "servico_preco, servico_duracao, created_at, cancelado_em, fim_em, clientes(nome, telefone)"
                 )
             ) {
                 filter { lte("data", ate.toString()) }
@@ -155,7 +171,7 @@ class AgendaRepositorio {
                 .select(
                     Columns.raw(
                         "id, data, horario_inicio, horario_fim, status, servico_nome, " +
-                            "servico_preco, servico_duracao, created_at, cancelado_em, clientes(nome, telefone)"
+                            "servico_preco, servico_duracao, created_at, cancelado_em, fim_em, clientes(nome, telefone)"
                     )
                 ) {
                     filter { eq("cliente_id", clienteId) }

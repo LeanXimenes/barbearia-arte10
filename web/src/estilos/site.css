@@ -126,6 +126,7 @@ body {
 .palco {
   flex: 1;
   min-height: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   overflow: hidden;
   position: relative;
 }
@@ -169,16 +170,16 @@ body {
   margin-bottom: -6px;
 }
 
-/* Abas no rodapé (celular) ---------------------------------------- */
+/* Abas logo abaixo do cabeçalho (celular) ---------------------------------------- */
 
 .barra-abas {
   flex: none;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  padding: 4px 6px;
   background: rgba(4, 10, 24, 0.97);
-  border-top: 1px solid var(--borda-suave);
+  border-bottom: 1px solid var(--borda-suave);
   z-index: 40;
 }
 

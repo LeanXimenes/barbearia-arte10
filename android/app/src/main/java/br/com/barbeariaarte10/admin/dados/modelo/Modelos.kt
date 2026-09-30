@@ -139,6 +139,8 @@ data class RespostaSimples(
     val erro: String? = null,
     val mensagem: String? = null,
     val id: String? = null,
+    /** Quantos registros foram apagados (apagar atendimentos). */
+    val apagados: Int = 0,
 )
 
 // -------------------------------------------------------------- pessoas
@@ -175,9 +177,45 @@ data class AgendamentoHistorico(
     @SerialName("clientes") val cliente: ClienteEmbutido? = null,
     /** Preenchido quando o dono cancelou o horário pelo app. */
     @SerialName("cancelado_em") val canceladoEm: String? = null,
-)
+    @SerialName("fim_em") val fimEm: String? = null,
+) {
+    /** Já passou pela cadeira (ou foi cancelado): pode ser apagado do app. */
+    val podeApagar: Boolean
+        get() = canceladoEm != null ||
+            fimEm?.let { runCatching { kotlinx.datetime.Instant.parse(it) <= kotlinx.datetime.Clock.System.now() }.getOrNull() } == true
+}
 
 // ------------------------------------------------------- Clube Arte 10
+
+/** Plano à venda no site (o dono cria e edita pelo app). */
+@Serializable
+data class Plano(
+    val id: String,
+    val nome: String,
+    val chamada: String? = null,
+    val preco: Double,
+    @SerialName("preco_referencia") val precoReferencia: Double? = null,
+    val cortes: Int,
+    @SerialName("validade_dias") val validadeDias: Int = 30,
+    val beneficios: List<String> = emptyList(),
+    val destaque: Boolean = false,
+    val ativo: Boolean = true,
+    val ordem: Int = 0,
+)
+
+@Serializable
+data class PlanoEdicao(
+    val nome: String,
+    val chamada: String? = null,
+    val preco: Double,
+    @SerialName("preco_referencia") val precoReferencia: Double? = null,
+    val cortes: Int,
+    @SerialName("validade_dias") val validadeDias: Int = 30,
+    val beneficios: List<String> = emptyList(),
+    val destaque: Boolean = false,
+    val ativo: Boolean = true,
+    val ordem: Int = 0,
+)
 
 /** Plano de um cliente (pedido, ativo ou encerrado). */
 @Serializable

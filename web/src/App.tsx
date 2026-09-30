@@ -117,6 +117,9 @@ export default function App() {
         aoAgendar={() => abrirAgendamento()}
       />
 
+      {/* Abas logo abaixo do cabeçalho (no celular); no computador ficam no cabeçalho. */}
+      <BarraAbas aba={aba} total={total} aoTrocarAba={irPara} />
+
       <main className="palco" onTouchStart={aoTocar} onTouchEnd={aoSoltar}>
         <div className="trilho" style={{ transform: `translateX(-${aba * 100}%)` }}>
           <section {...painel('inicio')}>
@@ -141,7 +144,7 @@ export default function App() {
           </section>
 
           <section {...painel('clube')}>
-            <SecaoClube config={config} />
+            <SecaoClube config={config} servicos={servicos} />
           </section>
 
           <section {...painel('horarios')}>
@@ -164,7 +167,6 @@ export default function App() {
         </div>
       </main>
 
-      <BarraAbas aba={aba} total={total} aoTrocarAba={irPara} />
 
       {modal.aberto && (
         <ModalAgendamento

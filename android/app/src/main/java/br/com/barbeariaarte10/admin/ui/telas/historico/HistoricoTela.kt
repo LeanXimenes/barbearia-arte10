@@ -13,6 +13,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import br.com.barbeariaarte10.admin.ui.tema.AzulNoite
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +66,8 @@ data class EstadoHistorico(
     val itens: List<AgendamentoHistorico> = emptyList(),
     val acabou: Boolean = false,
     val erro: String? = null,
+    val processando: Boolean = false,
+    val aviso: String? = null,
 )
 
 class HistoricoViewModel : ViewModel() {
@@ -111,7 +123,55 @@ class HistoricoViewModel : ViewModel() {
             }
         }
     }
+
+    fun limparAviso() = _estado.update { it.copy(aviso = null) }
+
+    /** Apaga do app um atendimento que já passou. */
+    fun apagar(item: AgendamentoHistorico) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            when (val r = Grafo.agenda.apagarAtendimento(item.id)) {
+                is Resultado.Sucesso -> {
+                    val ok = r.dado.ok
+                    _estado.update {
+                        it.copy(
+                            processando = false,
+                            itens = if (ok) it.itens.filterNot { x -> x.id == item.id } else it.itens,
+                            aviso = if (ok) "Atendimento apagado." else r.dado.mensagem,
+                        )
+                    }
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
+
+    /** Apaga todos os que já passaram pela cadeira. Horários futuros ficam. */
+    fun apagarPassados() {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            when (val r = Grafo.agenda.apagarAtendimentosPassados()) {
+                is Resultado.Sucesso -> {
+                    _estado.update {
+                        it.copy(
+                            processando = false,
+                            aviso = if (r.dado.ok) {
+                                "${r.dado.apagados} atendimento(s) apagado(s)."
+                            } else {
+                                r.dado.mensagem
+                            },
+                        )
+                    }
+                    carregar()
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
 }
+
 
 @Composable
 fun HistoricoTela(
@@ -119,6 +179,8 @@ fun HistoricoTela(
     modelo: HistoricoViewModel = viewModel(),
 ) {
     val estado by modelo.estado.collectAsStateWithLifecycle()
+    var apagando by remember { mutableStateOf<AgendamentoHistorico?>(null) }
+    var limpandoTudo by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -142,6 +204,19 @@ fun HistoricoTela(
                     color = MaterialTheme.colorScheme.onBackground,
                 )
             }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { limpandoTudo = true }, enabled = !estado.processando) {
+                Icon(Icons.Outlined.DeleteSweep, contentDescription = null, tint = Erro)
+                Spacer(Modifier.width(6.dp))
+                Text("Limpar", color = Erro)
+            }
+        }
+
+        estado.aviso?.let { aviso ->
+            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(aviso, style = MaterialTheme.typography.bodySmall, color = Ouro, modifier = Modifier.weight(1f))
+                TextButton(onClick = modelo::limparAviso) { Text("OK", color = Ouro) }
+            }
         }
 
         LazyColumn(
@@ -163,7 +238,12 @@ fun HistoricoTela(
                 }
             }
 
-            items(estado.itens, key = { it.id }) { item -> LinhaHistorico(item) }
+            items(estado.itens, key = { it.id }) { item ->
+                LinhaHistorico(
+                    item = item,
+                    aoApagar = if (item.podeApagar && !estado.processando) ({ apagando = item }) else null,
+                )
+            }
 
             if (!estado.acabou && estado.itens.isNotEmpty()) {
                 item {
@@ -181,10 +261,56 @@ fun HistoricoTela(
             item { Spacer(Modifier.height(20.dp)) }
         }
     }
+
+    apagando?.let { item ->
+        Confirmar(
+            titulo = "Apagar este atendimento?",
+            texto = "${item.cliente?.nome ?: "Cliente"} · ${Formato.dataCurta(item.data)} às " +
+                "${Formato.hora(item.horarioInicio)}. Some do app e não pode ser desfeito. " +
+                "O cadastro do cliente continua.",
+            aoConfirmar = {
+                modelo.apagar(item)
+                apagando = null
+            },
+            aoFechar = { apagando = null },
+        )
+    }
+
+    if (limpandoTudo) {
+        Confirmar(
+            titulo = "Apagar quem já passou pela cadeira?",
+            texto = "Apaga todos os atendimentos que já aconteceram e os cancelados. " +
+                "Os horários marcados para frente continuam. Não pode ser desfeito.",
+            aoConfirmar = {
+                modelo.apagarPassados()
+                limpandoTudo = false
+            },
+            aoFechar = { limpandoTudo = false },
+        )
+    }
 }
 
 @Composable
-private fun LinhaHistorico(item: AgendamentoHistorico) {
+private fun Confirmar(titulo: String, texto: String, aoConfirmar: () -> Unit, aoFechar: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = aoFechar,
+        containerColor = AzulNoite,
+        title = { Text(titulo) },
+        text = { Text(texto, color = TextoSuave) },
+        confirmButton = {
+            Button(
+                onClick = aoConfirmar,
+                colors = ButtonDefaults.buttonColors(containerColor = Erro, contentColor = Color.White),
+            ) { Text("Apagar") }
+        },
+        dismissButton = {
+            TextButton(onClick = aoFechar) { Text("Voltar", color = TextoSuave) }
+        },
+    )
+}
+
+@Composable
+private fun LinhaHistorico(item: AgendamentoHistorico, aoApagar: (() -> Unit)?) {
     CartaoArte10 {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(
@@ -236,6 +362,12 @@ private fun LinhaHistorico(item: AgendamentoHistorico) {
                     }
                 },
             )
+
+            if (aoApagar != null) {
+                IconButton(onClick = aoApagar) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Apagar atendimento", tint = TextoFraco)
+                }
+            }
         }
     }
 }
