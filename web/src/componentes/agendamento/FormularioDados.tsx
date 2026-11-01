@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { Assinatura, Servico } from '../../lib/tipos'
+import type { Assinatura, Conta, Servico } from '../../lib/tipos'
 import type { ClienteSalvo } from '../../lib/clienteSalvo'
+import type { TelaConta } from '../conta/ModalConta'
 import { consultarMeuPlano } from '../../servicos/api'
 import {
   dataCurta,
@@ -21,6 +22,9 @@ interface Props {
   nome: string
   telefone: string
   tentouEnviar: boolean
+  /** Logado: agenda com o nome e o número da conta, sem formulário. */
+  conta: Conta | null
+  aoAbrirConta: (tela: TelaConta) => void
   /** Cliente lembrado neste celular (do último agendamento). */
   salvo: ClienteSalvo | null
   usandoSalvo: boolean
@@ -38,6 +42,8 @@ export function FormularioDados({
   nome,
   telefone,
   tentouEnviar,
+  conta,
+  aoAbrirConta,
   salvo,
   usandoSalvo,
   aoUsarOutro,
@@ -47,7 +53,7 @@ export function FormularioDados({
 }: Props) {
   const nomeRuim = tentouEnviar && !nomeValido(nome)
   const telefoneRuim = tentouEnviar && !telefoneValido(telefone)
-  const plano = usePlanoDoTelefone(servico.usa_plano ? telefone : '')
+  const plano = usePlanoDoTelefone(servico.usa_plano ? (conta?.telefone ?? telefone) : '')
 
   return (
     <div>
@@ -85,7 +91,18 @@ export function FormularioDados({
         </div>
       )}
 
-      {usandoSalvo && salvo ? (
+      {conta ? (
+        <div className="cliente-salvo">
+          <span className="cliente-salvo__icone cliente-salvo__icone--conta" aria-hidden>
+            {conta.nome.trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="cliente-salvo__dados">
+            <span className="cliente-salvo__rotulo">Agendando pela sua conta</span>
+            <span className="cliente-salvo__nome">{conta.nome}</span>
+            <span className="cliente-salvo__tel">{telefoneBonito(conta.telefone)}</span>
+          </span>
+        </div>
+      ) : usandoSalvo && salvo ? (
         <div className="cliente-salvo">
           <span className="cliente-salvo__icone">
             <IconeUsuario tamanho={18} />
@@ -139,7 +156,9 @@ export function FormularioDados({
               aria-invalid={telefoneRuim}
             />
             {telefoneRuim ? (
-              <span className="campo__erro">Informe um telefone válido com DDD.</span>
+              <span className="campo__erro">
+                Informe um número válido com DDD, como (17) 99999-0000.
+              </span>
             ) : (
               <span className="campo__dica">Usamos só para identificar o seu agendamento.</span>
             )}
@@ -155,6 +174,20 @@ export function FormularioDados({
             </button>
           )}
         </>
+      )}
+
+      {!conta && (
+        <p className="convite-conta">
+          Tem conta?{' '}
+          <button type="button" className="link-ouro" onClick={() => aoAbrirConta('entrar')}>
+            Entrar
+          </button>{' '}
+          ou{' '}
+          <button type="button" className="link-ouro" onClick={() => aoAbrirConta('criar')}>
+            criar conta
+          </button>{' '}
+          para não digitar nada e ver seus horários depois.
+        </p>
       )}
     </div>
   )

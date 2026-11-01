@@ -42,6 +42,9 @@ delete from public.clientes c
  where not exists (select 1 from public.agendamentos a where a.cliente_id = c.id)
    and not exists (select 1 from public.assinaturas s where s.cliente_id = c.id);
 
+-- Contas do site criadas para teste (nome começando com "TESTE").
+delete from public.contas where nome ilike 'teste%';
+
 commit;
 
 select count(*) as agendamentos_restantes from public.agendamentos;

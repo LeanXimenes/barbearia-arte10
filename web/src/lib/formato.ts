@@ -84,9 +84,15 @@ export function duracao(minutos: number): string {
   return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
 }
 
+/** Só os dígitos do telefone, sem o +55 (quando vem do contato do celular). */
+export function digitosDoTelefone(valor: string): string {
+  const d = valor.replace(/\D/g, '')
+  return d.length > 11 && d.startsWith('55') ? d.slice(2) : d
+}
+
 /** Máscara progressiva de telefone brasileiro. */
 export function mascararTelefone(valor: string): string {
-  const d = valor.replace(/\D/g, '').slice(0, 11)
+  const d = digitosDoTelefone(valor).slice(0, 11)
   if (d.length <= 2) return d
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
@@ -98,9 +104,37 @@ export function telefoneBonito(valor: string): string {
   return mascararTelefone(valor)
 }
 
+// DDDs que existem no Brasil (a mesma lista do banco).
+const DDDS = new Set(
+  (
+    '11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 ' +
+    '41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 64 65 66 67 68 69 ' +
+    '71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99'
+  ).split(' '),
+)
+
+/**
+ * Número brasileiro de verdade: DDD que existe, celular com 9 na frente
+ * (11 dígitos) ou fixo começando com 2 a 5 (10 dígitos), e nada de
+ * 99999-9999. É a mesma regra que o banco usa na conta.
+ */
 export function telefoneValido(valor: string): boolean {
-  const d = valor.replace(/\D/g, '')
-  return d.length === 10 || d.length === 11
+  const d = digitosDoTelefone(valor)
+  if (!DDDS.has(d.slice(0, 2))) return false
+  const primeiro = d.charAt(2)
+  const formatoOk =
+    (d.length === 11 && primeiro === '9') || (d.length === 10 && '2345'.includes(primeiro))
+  return formatoOk && !/^(\d)\1*$/.test(d.slice(3))
+}
+
+export function emailValido(valor: string): boolean {
+  const v = valor.trim()
+  return v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v)
+}
+
+/** "Maria Souza" -> "Maria" */
+export function primeiroNome(nome: string): string {
+  return nome.trim().split(/\s+/)[0] ?? ''
 }
 
 export function nomeValido(valor: string): boolean {

@@ -33,6 +33,11 @@ const FUNCOES_PERMITIDAS = new Set([
   'criar_agendamento',
   'solicitar_plano',
   'meu_plano',
+  'criar_conta',
+  'entrar',
+  'sair',
+  'minha_conta',
+  'criar_agendamento_conta',
 ])
 
 const IDENTIFICADOR = /^[a-z_][a-z0-9_]*$/

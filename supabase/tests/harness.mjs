@@ -4,6 +4,7 @@
 // todas as migracoes e o seed — exatamente na ordem de producao.
 // =====================================================================
 import { PGlite } from '@electric-sql/pglite'
+import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,8 +31,13 @@ const AGENDA_DOS_TESTES = `
    where dia_semana = 6;
 `
 
+/** PostgreSQL vazio com a pgcrypto (no Supabase ela já vem instalada). */
+export function novoPostgres() {
+  return PGlite.create({ extensions: { pgcrypto } })
+}
+
 export async function criarBanco({ comSeed = true, agendaDeTeste = true } = {}) {
-  const db = await PGlite.create()
+  const db = await novoPostgres()
 
   await db.exec(await readFile(ARQ_SHIM, 'utf8'))
 

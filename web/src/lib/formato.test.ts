@@ -5,7 +5,9 @@ import {
   dataCurtaDoInstante,
   diaMesDoInstante,
   duracao,
+  emailValido,
   hora,
+  primeiroNome,
   linkWhatsapp,
   mascararTelefone,
   moeda,
@@ -73,6 +75,34 @@ describe('telefone', () => {
     expect(telefoneValido('(17) 99731-3480')).toBe(true)
     expect(telefoneValido('(17) 3456-7890')).toBe(true)
     expect(telefoneValido('123')).toBe(false)
+  })
+
+  it('só aceita número brasileiro de verdade', () => {
+    expect(telefoneValido('(20) 99731-3480')).toBe(false) // DDD 20 não existe
+    expect(telefoneValido('(01) 99731-3480')).toBe(false)
+    expect(telefoneValido('(17) 89731-3480')).toBe(false) // celular sem o 9
+    expect(telefoneValido('(17) 9973-3480')).toBe(false) // fixo não começa com 9
+    expect(telefoneValido('(17) 99999-9999')).toBe(false) // tudo repetido
+    expect(telefoneValido('(11) 98765-4321')).toBe(true)
+    expect(telefoneValido('(55) 99123-4567')).toBe(true) // DDD 55 (RS) não é o +55
+  })
+
+  it('tira o +55 de quem cola o número do contato', () => {
+    expect(mascararTelefone('+55 17 99731-3480')).toBe('(17) 99731-3480')
+    expect(telefoneValido('+55 (17) 99731-3480')).toBe(true)
+  })
+
+  it('valida e-mail', () => {
+    expect(emailValido('maria@email.com')).toBe(true)
+    expect(emailValido('  Maria@Email.com.br ')).toBe(true)
+    expect(emailValido('maria@')).toBe(false)
+    expect(emailValido('maria@email')).toBe(false)
+    expect(emailValido('ma ria@email.com')).toBe(false)
+    expect(emailValido('')).toBe(false)
+  })
+
+  it('pega o primeiro nome', () => {
+    expect(primeiroNome('  Maria   Souza ')).toBe('Maria')
   })
 
   it('monta o link do WhatsApp com DDI', () => {

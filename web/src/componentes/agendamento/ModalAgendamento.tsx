@@ -7,7 +7,13 @@ import type {
   HorarioDoDia,
   Servico,
 } from '../../lib/tipos'
-import { assinarAgenda, carregarDias, carregarHorarios, criarAgendamento } from '../../servicos/api'
+import {
+  assinarAgenda,
+  carregarDias,
+  carregarHorarios,
+  criarAgendamento,
+  criarAgendamentoConta,
+} from '../../servicos/api'
 import { dataCurta, hora, mascararTelefone, nomeValido, telefoneValido } from '../../lib/formato'
 import { agoraNaBarbearia, somarDias } from '../../lib/relogio'
 import {
@@ -22,6 +28,8 @@ import { EscolhaHorario } from './EscolhaHorario'
 import { FormularioDados } from './FormularioDados'
 import { lerCliente, salvarCliente, type ClienteSalvo } from '../../lib/clienteSalvo'
 import { Confirmacao } from './Confirmacao'
+import { useConta } from '../../hooks/useConta'
+import type { TelaConta } from '../conta/ModalConta'
 import { IconeAlerta, IconeFechar, IconeVoltar } from '../Icones'
 
 type Passo = 'servico' | 'data' | 'horario' | 'dados' | 'confirmado'
@@ -41,7 +49,11 @@ interface Props {
   config: ConfigBarbearia | null
   servicoInicialId?: string | null
   online: boolean
+  /** A janela da conta está por cima: Esc e clique fora são dela. */
+  pausado?: boolean
   aoFechar: () => void
+  aoAbrirConta: (tela: TelaConta) => void
+  aoVerMeusHorarios: () => void
 }
 
 function novaChave(): string {
@@ -49,7 +61,20 @@ function novaChave(): string {
   return `k-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 }
 
-export function ModalAgendamento({ servicos, config, servicoInicialId, online, aoFechar }: Props) {
+export function ModalAgendamento({
+  servicos,
+  config,
+  servicoInicialId,
+  online,
+  pausado = false,
+  aoFechar,
+  aoAbrirConta,
+  aoVerMeusHorarios,
+}: Props) {
+  // Logado, o nome e o número vêm da conta: nada para digitar.
+  const { conta, token, atualizar: atualizarConta, sessaoExpirou } = useConta()
+  const logado = Boolean(conta && token)
+
   const fuso = config?.fuso
   const hoje = useMemo(() => agoraNaBarbearia(fuso).data, [fuso])
   const janelaDias = config?.antecedencia_maxima_dias ?? 60
@@ -110,11 +135,11 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
 
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !enviando) aoFechar()
+      if (e.key === 'Escape' && !enviando && !pausado) aoFechar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [aoFechar, enviando])
+  }, [aoFechar, enviando, pausado])
 
   // ------------------------------------------------------------------
   // Carregamento de dados
@@ -237,7 +262,7 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
     setTentouEnviar(true)
 
     if (!servico || !data || !horario) return
-    if (!nomeValido(nome) || !telefoneValido(telefone)) return
+    if (!logado && (!nomeValido(nome) || !telefoneValido(telefone))) return
 
     if (!online) {
       setErroEnvio(MSG_SEM_CONEXAO)
@@ -248,14 +273,11 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
     setErroEnvio(null)
 
     try {
-      const resposta = await criarAgendamento({
-        servicoId: servico.id,
-        data,
-        horario,
-        nome,
-        telefone,
-        chave: chaveRef.current,
-      })
+      const pedido = { servicoId: servico.id, data, horario, chave: chaveRef.current }
+      const resposta =
+        logado && token
+          ? await criarAgendamentoConta(token, pedido)
+          : await criarAgendamento({ ...pedido, nome, telefone })
 
       if (resposta.ok) {
         const lembrado = {
@@ -265,9 +287,23 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
         salvarCliente(lembrado)
         setSalvo(lembrado)
         setUsandoSalvo(true)
+        if (logado) void atualizarConta()
         setResultado({ agendamento: resposta.agendamento, barbearia: resposta.barbearia })
         setPasso('confirmado')
         void buscarHorarios(true)
+        return
+      }
+
+      // A sessão acabou (saiu em outro aparelho, venceu): vira visitante e
+      // os dados lembrados preenchem o formulário. Nada foi gravado.
+      if (resposta.erro === 'SESSAO_EXPIRADA') {
+        sessaoExpirou()
+        const lembrado = lerCliente()
+        setSalvo(lembrado)
+        setUsandoSalvo(lembrado !== null)
+        setNome(lembrado?.nome ?? '')
+        setTelefone(lembrado ? mascararTelefone(lembrado.telefone) : '')
+        setErroEnvio(`${resposta.mensagem} Ou confirme com os dados abaixo.`)
         return
       }
 
@@ -308,7 +344,8 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
   const mesLimite = ultimaData.slice(0, 7)
 
   const podeConfirmar =
-    Boolean(servico && data && horario) && nomeValido(nome) && telefoneValido(telefone)
+    Boolean(servico && data && horario) &&
+    (logado || (nomeValido(nome) && telefoneValido(telefone)))
 
   return (
     <div
@@ -317,7 +354,7 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
       aria-modal="true"
       aria-label="Agendar horário"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !enviando) aoFechar()
+        if (e.target === e.currentTarget && !enviando && !pausado) aoFechar()
       }}
     >
       <div className="modal__caixa">
@@ -342,7 +379,9 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
             />
           )}
 
-          <h2 className="modal__titulo">{TITULOS[passo]}</h2>
+          <h2 className="modal__titulo">
+            {passo === 'dados' && logado ? 'Confirme o horário' : TITULOS[passo]}
+          </h2>
 
           <button
             type="button"
@@ -422,6 +461,8 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
               nome={nome}
               telefone={telefone}
               tentouEnviar={tentouEnviar}
+              conta={logado ? conta : null}
+              aoAbrirConta={aoAbrirConta}
               salvo={salvo}
               usandoSalvo={usandoSalvo}
               aoUsarOutro={() => {
@@ -484,6 +525,11 @@ export function ModalAgendamento({ servicos, config, servicoInicialId, online, a
             <button type="button" className="botao botao--ouro botao--bloco" onClick={aoFechar}>
               Concluir
             </button>
+            {logado && (
+              <button type="button" className="botao botao--contorno" onClick={aoVerMeusHorarios}>
+                Ver meus horários
+              </button>
+            )}
             <button type="button" className="botao botao--fantasma" onClick={recomecar}>
               Agendar outro horário
             </button>

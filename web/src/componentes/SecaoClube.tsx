@@ -3,6 +3,7 @@ import type { Assinatura, ConfigBarbearia, Plano, Servico } from '../lib/tipos'
 import { contaDoPlano, precoDoCorteDoPlano, sufixoDoPreco, vantagensDoPlano } from '../lib/planos'
 import { useClube } from '../hooks/useClube'
 import { lerCliente } from '../lib/clienteSalvo'
+import { useConta } from '../hooks/useConta'
 import { consultarMeuPlano } from '../servicos/api'
 import { dataCurtaDoInstante, linkWhatsapp } from '../lib/formato'
 import { IconeAlerta, IconeCheck, IconeCoroa, IconeWhatsapp } from './Icones'
@@ -23,15 +24,21 @@ export function SecaoClube({ config, servicos }: Props) {
   const [escolhido, setEscolhido] = useState<Plano | null>(null)
   const [meuPlano, setMeuPlano] = useState<Assinatura | null>(null)
 
-  // Quem já agendou neste celular vê a situação do próprio plano.
+  // Quem está logado (ou já agendou neste celular) vê a situação do próprio plano.
+  const { conta } = useConta()
+  const telefoneDaConta = conta?.telefone ?? null
   const atualizarMeuPlano = () => {
-    const salvo = lerCliente()
-    if (!salvo) return
-    consultarMeuPlano(salvo.telefone)
+    const telefone = telefoneDaConta ?? lerCliente()?.telefone
+    if (!telefone) {
+      setMeuPlano(null)
+      return
+    }
+    consultarMeuPlano(telefone)
       .then(setMeuPlano)
       .catch(() => setMeuPlano(null))
   }
-  useEffect(atualizarMeuPlano, [])
+  // Entrou ou saiu da conta: o plano mostrado acompanha.
+  useEffect(atualizarMeuPlano, [telefoneDaConta])
 
   return (
     <div className="container aba__conteudo clube">

@@ -185,6 +185,26 @@ agendamentos, clientes nem os seus dados**.
   aquele telefone desconta 1 do plano, e o cliente vê quantos restam.
 - Se o dono cancelar um horário que usou o plano, o corte volta.
 
+### Conta do cliente (login no site)
+
+- O cliente cria a conta com **nome, celular e senha** (o e-mail é opcional).
+  O celular precisa ser um número brasileiro de verdade (DDD que existe,
+  9 na frente). Depois ele entra com o **celular ou o e-mail**.
+- Logado, ele agenda **sem digitar nome nem número** e vê, em "Minha conta",
+  os horários que marcou (inclusive os que o dono cancelou).
+- Quem não quiser conta continua agendando como antes.
+- Não usa o "Authentication" do Supabase nem SMS: não há nada para configurar
+  no painel. A senha fica guardada com bcrypt e 5 senhas erradas travam
+  aquele login por 15 minutos.
+- **Cliente esqueceu a senha?** No SQL Editor, troque o número e a senha
+  nova e rode (depois avise o cliente para entrar com ela):
+
+  ```sql
+  update public.contas
+     set senha_hash = extensions.crypt('senha-nova', extensions.gen_salt('bf', 10))
+   where telefone = '17999990000';
+  ```
+
 ## Mapa do banco
 
 ### Tabelas
@@ -202,6 +222,9 @@ agendamentos, clientes nem os seus dados**.
 | `dispositivos_push` | Tokens FCM dos aparelhos. |
 | `notificacoes` | Fila dos pushes, com status, tentativas e erro. |
 | `private.segredos` | URL e token da Edge Function. Sem acesso para ninguém da API. |
+| `contas` | Conta do cliente no site: nome, celular (único), e-mail (opcional) e o hash da senha. Sem acesso pela API. |
+| `sessoes_conta` | Aparelhos logados. Só o hash do código de cada sessão. Sem acesso pela API. |
+| `tentativas_login` | Senhas erradas recentes (para travar quem fica chutando). Sem acesso pela API. |
 
 ### Funções
 
@@ -210,6 +233,9 @@ agendamentos, clientes nem os seus dados**.
 | `horarios_disponiveis(servico, data)` | site | Grade do dia, com `disponivel` e o motivo (`ocupado` / `bloqueado`). |
 | `dias_disponiveis(servico, início, fim)` | site | Por dia: abre? dentro da janela? quantos horários livres? |
 | `criar_agendamento(...)` | site | **Único** caminho de gravação. Revalida tudo, idempotente, com freio anti-robô. |
+| `criar_conta(nome, celular, senha, e-mail)` / `entrar(celular ou e-mail, senha)` / `sair(sessão)` | site | Conta do cliente. Devolvem a sessão. |
+| `minha_conta(sessão)` | site | Dados da conta e os horários marcados por ela. |
+| `criar_agendamento_conta(sessão, ...)` | site | Agenda com o nome e o número da conta (mesmas regras de `criar_agendamento`). |
 | `agenda_do_dia(data)` | app | Linha do tempo: agendado / bloqueado / livre (na mesma grade do site) / intervalo. |
 | `visao_geral_periodo(início, fim)` | app | Contagens por dia para o calendário. |
 | `criar_bloqueio(...)` / `remover_bloqueio(id)` | app | Fecha / libera um período. Nunca toca em agendamento de cliente. |

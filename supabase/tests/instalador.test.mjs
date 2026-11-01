@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { PGlite } from '@electric-sql/pglite'
+import { novoPostgres } from './harness.mjs'
 import { montarInstalador } from '../gerar_instalador.mjs'
 
 const aqui = dirname(fileURLToPath(import.meta.url))
@@ -21,7 +21,7 @@ test('instalar_tudo.sql está em dia com as migrações e o seed', () => {
 })
 
 test('o instalador roda do zero e pode ser rodado de novo sem erro', async () => {
-  const db = await PGlite.create()
+  const db = await novoPostgres()
   await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
   const sql = readFileSync(INSTALADOR, 'utf8')
 
@@ -43,7 +43,7 @@ test('o instalador roda do zero e pode ser rodado de novo sem erro', async () =>
 })
 
 test('limpar_testes.sql apaga só os agendamentos "TESTE" e religa a proteção', async () => {
-  const db = await PGlite.create()
+  const db = await novoPostgres()
   await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
   await db.exec(readFileSync(INSTALADOR, 'utf8'))
 
@@ -59,11 +59,21 @@ test('limpar_testes.sql apaga só os agendamentos "TESTE" e religa a proteção'
     const r = await db.query('select public.criar_agendamento($1,$2,$3,$4,$5,null) as r', [corte, dia, hora, nome, tel])
     assert.equal(r.rows[0].r.ok, true, `reserva de ${nome} falhou`)
   }
+  // Conta de teste logada, com horário marcado por ela.
+  const conta = (await db.query("select public.criar_conta('TESTE Conta', '17988880020', 'segredo1') as r")).rows[0].r
+  assert.equal(conta.ok, true, 'conta de teste não foi criada')
+  const logado = await db.query('select public.criar_agendamento_conta($1,$2,$3,$4,null) as r', [
+    conta.sessao.token, corte, dia, '09:00',
+  ])
+  assert.equal(logado.rows[0].r.ok, true, `reserva da conta de teste falhou: ${logado.rows[0].r.erro}`)
+  await db.query("select public.criar_conta('Conta Real', '17988880021', 'segredo1')")
 
   await db.exec(readFileSync(join(aqui, '..', 'limpar_testes.sql'), 'utf8'))
 
   const nomes = (await db.query('select cliente_nome from public.agendamentos')).rows.map((r) => r.cliente_nome)
   assert.deepEqual(nomes, ['Cliente Real'], 'apagou demais ou de menos')
+  const contas = (await db.query('select nome from public.contas')).rows.map((r) => r.nome)
+  assert.deepEqual(contas, ['Conta Real'], 'contas de teste não foram apagadas')
   const espelho = (await db.query('select count(*)::int as n from public.agenda_publica')).rows[0].n
   assert.equal(espelho, 1, 'o horário do teste continuou ocupado no site')
 
@@ -73,7 +83,7 @@ test('limpar_testes.sql apaga só os agendamentos "TESTE" e religa a proteção'
 })
 
 test('dados_da_barbearia.sql corrige um banco instalado com os dados de exemplo', async () => {
-  const db = await PGlite.create()
+  const db = await novoPostgres()
   await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
   await db.exec(readFileSync(INSTALADOR, 'utf8'))
 
@@ -151,7 +161,7 @@ test('dados_da_barbearia.sql corrige um banco instalado com os dados de exemplo'
 })
 
 test('ativar_push.sql recusa rodar com os valores de exemplo', async () => {
-  const db = await PGlite.create()
+  const db = await novoPostgres()
   await db.exec(readFileSync(join(aqui, 'auth_shim.sql'), 'utf8'))
   await db.exec(readFileSync(INSTALADOR, 'utf8'))
   const ativar = readFileSync(join(aqui, '..', 'ativar_push.sql'), 'utf8')

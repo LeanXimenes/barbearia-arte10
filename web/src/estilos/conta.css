@@ -1,0 +1,327 @@
+/* =====================================================================
+   BARBEARIA ARTE 10 — Conta do cliente (entrar, criar conta, horários)
+   ===================================================================== */
+
+/* Botão da conta no cabeçalho ------------------------------------- */
+
+.cabecalho__acao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.botao-conta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--borda);
+  background: rgba(10, 23, 48, 0.5);
+  color: var(--texto);
+  font-size: 0.88rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition:
+    border-color var(--transicao),
+    color var(--transicao);
+}
+
+.botao-conta:hover {
+  border-color: var(--ouro-500);
+  color: var(--ouro-300);
+}
+
+.botao-conta__inicial {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+@media (min-width: 900px) {
+  .botao-conta {
+    width: auto;
+    padding: 0 14px 0 10px;
+  }
+  .botao-conta--logado {
+    padding-left: 6px;
+  }
+}
+
+/* Links dourados (texto sublinhado) -------------------------------- */
+
+.link-ouro {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ouro-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-ouro:hover {
+  color: var(--ouro-200);
+}
+
+/* Formulários ------------------------------------------------------- */
+
+.conta__abas {
+  padding: 16px 20px 0;
+  flex-shrink: 0;
+}
+
+.conta__abas .alternador {
+  max-width: none;
+}
+
+.conta__intro {
+  margin-bottom: 18px;
+  font-size: 0.92rem;
+  color: var(--texto-suave);
+}
+
+.campo__opcional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.campo__senha {
+  position: relative;
+}
+
+.campo__senha .campo__entrada {
+  padding-right: 96px;
+}
+
+.campo__mostrar {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ouro-300);
+}
+
+.campo__mostrar:hover {
+  background: rgba(233, 200, 79, 0.1);
+}
+
+.conta__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+
+.modal__corpo > .aviso {
+  margin-top: 4px;
+  margin-bottom: 14px;
+}
+
+/* Convite para entrar, no agendamento ------------------------------- */
+
+.convite-conta {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: var(--raio-sm);
+  border: 1px dashed var(--borda);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--texto-suave);
+}
+
+.cliente-salvo__icone--conta {
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  font-weight: 800;
+}
+
+/* Minha conta -------------------------------------------------------- */
+
+.conta__perfil {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  background: rgba(233, 200, 79, 0.06);
+}
+
+.conta__avatar {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.conta__dados {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.conta__nome {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.conta__linha {
+  font-size: 0.86rem;
+  color: var(--texto-suave);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.conta__titulo {
+  margin: 24px 0 10px;
+  font-family: var(--fonte);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}
+
+.conta__vazio {
+  padding: 16px;
+  border-radius: var(--raio-sm);
+  border: 1px dashed var(--borda-suave);
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+  text-align: center;
+}
+
+.conta__ajuda {
+  display: block;
+  margin-top: 20px;
+  line-height: 1.6;
+}
+
+.horarios-conta {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.horario-conta {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--borda-suave);
+  background: rgba(14, 32, 71, 0.35);
+}
+
+.horario-conta__data {
+  width: 50px;
+  padding: 7px 0;
+  border-radius: 10px;
+  background: rgba(233, 200, 79, 0.1);
+  color: var(--ouro-300);
+  text-align: center;
+  line-height: 1.1;
+}
+
+.horario-conta__dia {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.horario-conta__mes {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.horario-conta__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.horario-conta__servico {
+  font-size: 0.97rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+
+.horario-conta__extra {
+  font-size: 0.76rem;
+  color: var(--texto-fraco);
+}
+
+.horario-conta--cancelado {
+  opacity: 0.7;
+}
+
+.horario-conta--cancelado .horario-conta__servico {
+  text-decoration: line-through;
+}
+
+.selo {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selo--marcado {
+  color: var(--ouro-300);
+  background: rgba(233, 200, 79, 0.12);
+  border-color: rgba(233, 200, 79, 0.35);
+}
+
+.selo--agora {
+  color: #bbf7d0;
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.selo--cancelado {
+  color: #ffd9de;
+  background: rgba(251, 113, 133, 0.1);
+  border-color: rgba(251, 113, 133, 0.35);
+}
+
+.selo--neutro {
+  color: var(--texto-suave);
+  background: rgba(154, 168, 198, 0.1);
+  border-color: var(--borda-suave);
+}

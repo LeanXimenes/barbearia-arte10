@@ -65,10 +65,38 @@ export interface AgendamentoConfirmado {
   inicio_em: string
   fim_em: string
   status: string
+  /** O dono cancelou pelo app (o horário voltou a ficar livre). */
+  cancelado?: boolean
   created_at: string
   /** Presente quando este agendamento usou um corte do plano do cliente. */
   plano?: UsoDoPlano | null
 }
+
+/** Conta do cliente no site. */
+export interface Conta {
+  nome: string
+  telefone: string
+  email: string | null
+  desde: string
+}
+
+export interface Sessao {
+  token: string
+  expira_em: string
+}
+
+export type RespostaConta =
+  | { ok: true; sessao: Sessao; conta: Conta }
+  | { ok: false; erro: string; mensagem: string }
+
+export type RespostaMinhaConta =
+  | {
+      ok: true
+      conta: Conta
+      proximos: AgendamentoConfirmado[]
+      anteriores: AgendamentoConfirmado[]
+    }
+  | { ok: false; erro: string; mensagem: string }
 
 export interface UsoDoPlano {
   nome: string

@@ -11,6 +11,14 @@
         "web"
       ],
       "port": 5173
+    },
+    {
+      "name": "api-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "supabase/tests/servidor-local.mjs"
+      ],
+      "port": 54321
     }
   ]
 }

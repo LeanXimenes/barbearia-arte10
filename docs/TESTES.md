@@ -3,12 +3,12 @@
 ## Como rodar
 
 ```powershell
-# Banco (97), push (9) e instalador (4)
+# Banco (126), push (9) e instalador (5)
 cd C:\arte10\supabase\tests
 npm install
 npm test
 
-# Site (18)
+# Site (56)
 cd C:\arte10\web
 npm test
 
@@ -34,6 +34,7 @@ arquivo extra é `auth_shim.sql`, que recria o mínimo do Supabase (schema
 | **Regra absoluta** | Agendamento não é apagado nem alterado — nem por `DELETE`, nem por `TRUNCATE` em cascata, nem pelo dono do banco; status só depois do horário; nenhum status libera o horário |
 | Correções da auditoria | Nome do cliente preservado no histórico, freio anti-robô, grade do dono igual à do site, cliente não some ao encurtar o expediente, resumo de clientes |
 | Push no banco (pg_net simulado) | Chamada com token, reenvio sem duplicar, reserva atômica, erro HTTP registrado, limite de tentativas, só administradores ativos, falha do push não derruba a reserva |
+| Conta do cliente (login) | Número brasileiro válido, senha com bcrypt e sessão só em hash, número/e-mail sem repetir, entrar por número ou e-mail, trava depois de 5 senhas erradas, sessão vencida, agendar logado, cada conta só vê os próprios horários, freio de contas novas |
 | Edge Function (`fcm.test.mjs`) | Classificação dos erros do FCM (um erro de payload não desativa aparelhos), mensagem, token, UUID |
 | Instalador (`instalador.test.mjs`) | `instalar_tudo.sql` em dia, roda duas vezes sem erro, `limpar_testes.sql`, `ativar_push.sql` protegido |
 

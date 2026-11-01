@@ -1,15 +1,19 @@
 import type { KeyboardEvent } from 'react'
 import { ABAS } from '../lib/abas'
-import { IconeTesoura } from './Icones'
+import type { Conta } from '../lib/tipos'
+import { primeiroNome } from '../lib/formato'
+import { IconeTesoura, IconeUsuario } from './Icones'
 
 interface Props {
   aba: number
   total: number
+  conta: Conta | null
   aoTrocarAba: (indice: number) => void
   aoAgendar: () => void
+  aoAbrirConta: () => void
 }
 
-export function Cabecalho({ aba, total, aoTrocarAba, aoAgendar }: Props) {
+export function Cabecalho({ aba, total, conta, aoTrocarAba, aoAgendar, aoAbrirConta }: Props) {
   // Setas do teclado andam entre as abas, como pede o padrão de acessibilidade.
   const aoTeclar = (e: KeyboardEvent) => {
     if (e.key === 'ArrowRight') aoTrocarAba((aba + 1) % total)
@@ -53,6 +57,21 @@ export function Cabecalho({ aba, total, aoTrocarAba, aoAgendar }: Props) {
         </nav>
 
         <div className="cabecalho__acao">
+          <button
+            type="button"
+            className={`botao-conta ${conta ? 'botao-conta--logado' : ''}`}
+            onClick={aoAbrirConta}
+            aria-label={conta ? `Minha conta (${conta.nome})` : 'Entrar na conta'}
+          >
+            {conta ? (
+              <span className="botao-conta__inicial" aria-hidden>
+                {conta.nome.trim().charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <IconeUsuario tamanho={18} />
+            )}
+            <span className="so-desktop">{conta ? primeiroNome(conta.nome) : 'Entrar'}</span>
+          </button>
           <button type="button" className="botao botao--ouro" onClick={aoAgendar}>
             <IconeTesoura tamanho={17} />
             <span>

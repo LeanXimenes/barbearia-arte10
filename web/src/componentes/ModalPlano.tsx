@@ -212,7 +212,9 @@ export function ModalPlano({ plano, config, aoFechar }: Props) {
                       aria-invalid={telRuim}
                     />
                     {telRuim ? (
-                      <span className="campo__erro">Informe um telefone válido com DDD.</span>
+                      <span className="campo__erro">
+                        Informe um número válido com DDD, como (17) 99999-0000.
+                      </span>
                     ) : (
                       <span className="campo__dica">
                         Use o mesmo número quando for agendar: é por ele que o plano desconta.

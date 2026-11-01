@@ -23,6 +23,15 @@ export function lerCliente(): ClienteSalvo | null {
   }
 }
 
+/** Ao sair da conta, o aparelho deixa de lembrar o nome e o número. */
+export function esquecerCliente(): void {
+  try {
+    window.localStorage.removeItem(CHAVE)
+  } catch {
+    // Nada a fazer.
+  }
+}
+
 export function salvarCliente(cliente: ClienteSalvo): void {
   try {
     window.localStorage.setItem(

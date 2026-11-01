@@ -13,11 +13,20 @@ import { SecaoApp } from './componentes/SecaoApp'
 import { SecaoClube } from './componentes/SecaoClube'
 import { abertoComoApp } from './hooks/useInstalarApp'
 import { ModalAgendamento } from './componentes/agendamento/ModalAgendamento'
+import { ModalConta, type TelaConta } from './componentes/conta/ModalConta'
 import { IconeAlerta } from './componentes/Icones'
+import { useConta } from './hooks/useConta'
 
 export default function App() {
   const { config, servicos, funcionamento, carregando, erro, recarregar } = useDadosDaBarbearia()
   const online = useOnline()
+  const { conta } = useConta()
+
+  // Entrar / criar conta / "Minha conta". Pode abrir por cima do agendamento.
+  const [modalConta, setModalConta] = useState<{
+    tela: TelaConta
+    voltarAoAgendamento: boolean
+  } | null>(null)
 
   // Quem já abriu pelo app instalado não precisa da aba que ensina a instalar.
   const [total] = useState(() => (abertoComoApp() ? ABAS.length - 1 : ABAS.length))
@@ -42,6 +51,11 @@ export default function App() {
     setModal({ aberto: true, servicoId })
 
   const fecharAgendamento = () => setModal({ aberto: false, servicoId: null })
+
+  const abrirConta = (tela: TelaConta = 'entrar', voltarAoAgendamento = false) =>
+    setModalConta({ tela, voltarAoAgendamento })
+
+  const fecharConta = () => setModalConta(null)
 
   const irPara = (indice: number) => setAba(Math.max(0, Math.min(total - 1, indice)))
 
@@ -113,8 +127,10 @@ export default function App() {
       <Cabecalho
         aba={aba}
         total={total}
+        conta={conta}
         aoTrocarAba={irPara}
         aoAgendar={() => abrirAgendamento()}
+        aoAbrirConta={() => abrirConta()}
       />
 
       {/* Abas logo abaixo do cabeçalho (no celular); no computador ficam no cabeçalho. */}
@@ -174,7 +190,27 @@ export default function App() {
           config={config}
           servicoInicialId={modal.servicoId}
           online={online}
+          pausado={modalConta !== null}
           aoFechar={fecharAgendamento}
+          aoAbrirConta={(tela) => abrirConta(tela, true)}
+          aoVerMeusHorarios={() => {
+            fecharAgendamento()
+            abrirConta()
+          }}
+        />
+      )}
+
+      {/* Depois do agendamento no DOM: fica por cima quando os dois estão abertos. */}
+      {modalConta && (
+        <ModalConta
+          telaInicial={modalConta.tela}
+          config={config}
+          voltarAoAgendamento={modalConta.voltarAoAgendamento}
+          aoFechar={fecharConta}
+          aoAgendar={() => {
+            fecharConta()
+            abrirAgendamento()
+          }}
         />
       )}
     </div>

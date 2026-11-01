@@ -4,6 +4,8 @@ import type {
   Assinatura,
   Plano,
   Promocao,
+  RespostaConta,
+  RespostaMinhaConta,
   RespostaPlano,
   ConfigBarbearia,
   DiaDisponivel,
@@ -106,8 +108,29 @@ export async function criarAgendamento(pedido: PedidoDeAgendamento): Promise<Res
   // Falha de transporte (rede, servidor fora do ar): propaga para que a
   // tela mostre "não foi possível concluir" — e nunca um falso sucesso.
   if (error) throw error
+  return normalizarResposta(data as RespostaAgendamento)
+}
 
-  const resposta = data as RespostaAgendamento
+/**
+ * Agendamento de quem está logado: o nome e o número vêm da conta, no
+ * servidor. As regras e a idempotência são as mesmas do agendamento normal.
+ */
+export async function criarAgendamentoConta(
+  token: string,
+  pedido: Omit<PedidoDeAgendamento, 'nome' | 'telefone'>,
+): Promise<RespostaAgendamento> {
+  const { data, error } = await supabase.rpc('criar_agendamento_conta', {
+    p_token: token,
+    p_servico_id: pedido.servicoId,
+    p_data: pedido.data,
+    p_horario_inicio: pedido.horario,
+    p_idempotency_key: pedido.chave,
+  })
+  if (error) throw error
+  return normalizarResposta(data as RespostaAgendamento)
+}
+
+function normalizarResposta(resposta: RespostaAgendamento): RespostaAgendamento {
   if (resposta?.ok) {
     resposta.agendamento.preco = Number(resposta.agendamento.preco)
   }
@@ -205,6 +228,50 @@ export async function solicitarPlano(
   })
   if (error) throw error
   return data as RespostaPlano
+}
+
+// ---------------------------------------------------------------------
+// Conta do cliente (login com número ou e-mail + senha)
+// ---------------------------------------------------------------------
+
+export interface DadosNovaConta {
+  nome: string
+  telefone: string
+  senha: string
+  email: string
+}
+
+export async function criarConta(dados: DadosNovaConta): Promise<RespostaConta> {
+  const { data, error } = await supabase.rpc('criar_conta', {
+    p_nome: dados.nome,
+    p_telefone: dados.telefone,
+    p_senha: dados.senha,
+    p_email: dados.email.trim() || null,
+  })
+  if (error) throw error
+  return data as RespostaConta
+}
+
+/** `login` é o número (com ou sem máscara) ou o e-mail. */
+export async function entrarNaConta(login: string, senha: string): Promise<RespostaConta> {
+  const { data, error } = await supabase.rpc('entrar', { p_login: login, p_senha: senha })
+  if (error) throw error
+  return data as RespostaConta
+}
+
+export async function sairDaConta(token: string): Promise<void> {
+  const { error } = await supabase.rpc('sair', { p_token: token })
+  if (error) throw error
+}
+
+export async function carregarMinhaConta(token: string): Promise<RespostaMinhaConta> {
+  const { data, error } = await supabase.rpc('minha_conta', { p_token: token })
+  if (error) throw error
+  const r = data as RespostaMinhaConta
+  if (r?.ok) {
+    for (const a of [...r.proximos, ...r.anteriores]) a.preco = Number(a.preco)
+  }
+  return r
 }
 
 /** Plano (pedido, ativo ou recém-encerrado) ligado a um telefone. */

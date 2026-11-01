@@ -12,6 +12,10 @@ export const MSG_SEM_CONEXAO =
 export const MSG_FALHA_GENERICA =
   'Não foi possível concluir o agendamento. Tente novamente em instantes.'
 
+export const MSG_CONTA_SEM_CONEXAO = 'Sem conexão. Verifique a internet e tente de novo.'
+
+export const MSG_CONTA_FALHA = 'Não foi possível concluir agora. Tente de novo em instantes.'
+
 export const MSG_FALHA_CARREGAR =
   'Não conseguimos carregar as informações agora. Verifique sua conexão e tente novamente.'
 

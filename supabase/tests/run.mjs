@@ -1572,6 +1572,232 @@ await teste('plano à venda: exclui se ninguém pegou; se já pegaram, pede para
 await dbc.close()
 
 // =====================================================================
+grupo('Conta do cliente: login no site')
+// =====================================================================
+// Banco próprio: os limites (contas por 10 min, reservas por número) não
+// se misturam com os outros grupos.
+const dbk = await criarBanco()
+const umaK = async (sql, params = []) => (await dbk.query(sql, params)).rows[0]
+const rpcK = async (funcao, args) => {
+  const marcas = args.map((_, i) => `$${i + 1}`).join(', ')
+  const linha = await comoAnonimo(dbk, () => umaK(`select public.${funcao}(${marcas}) as r`, args))
+  return linha.r
+}
+const criarConta = (nome, telefone, senha, email = null) =>
+  rpcK('criar_conta', [nome, telefone, senha, email])
+
+const CORTE_K = await umaK("select * from public.servicos where nome = 'Corte de cabelo'")
+const DIA_K = iso((await umaK(
+  `select g::date as d from generate_series((now() at time zone 'America/Sao_Paulo')::date + 1,
+     (now() at time zone 'America/Sao_Paulo')::date + 30, interval '1 day') g
+    where extract(dow from g) between 1 and 4 order by g limit 1`
+)).d)
+
+let TOKEN_MARIA = ''
+let AG_MARIA = ''
+
+await teste('as tabelas de conta não ficam abertas para o site nem para o app', async () => {
+  for (const tabela of ['contas', 'sessoes_conta', 'tentativas_login']) {
+    await lancaErro(
+      () => comoAnonimo(dbk, () => dbk.query(`select * from public.${tabela}`)),
+      'permission denied',
+      `anon leu ${tabela}`
+    )
+    await lancaErro(
+      () => comoUsuarioComum(dbk, randomUUID(), () => dbk.query(`select * from public.${tabela}`)),
+      'permission denied',
+      `authenticated leu ${tabela}`
+    )
+  }
+  await lancaErro(() => rpcK('conta_da_sessao', ['x']), 'permission denied', 'função interna exposta')
+  await lancaErro(() => rpcK('resposta_sessao', [randomUUID()]), 'permission denied', 'função interna exposta')
+})
+
+await teste('criar conta exige nome, número brasileiro válido e senha de 6 ou mais', async () => {
+  const casos = [
+    [['J', '17999990001', 'segredo1'], 'NOME_INVALIDO'],
+    [['João', '20999990001', 'segredo1'], 'TELEFONE_INVALIDO'], // DDD 20 não existe
+    [['João', '17899990001', 'segredo1'], 'TELEFONE_INVALIDO'], // celular sem o 9
+    [['João', '17999999999', 'segredo1'], 'TELEFONE_INVALIDO'], // número repetido
+    [['João', '1799999', 'segredo1'], 'TELEFONE_INVALIDO'],
+    [['João', '17999990001', 'segredo1', 'joao@'], 'EMAIL_INVALIDO'],
+    [['João', '17999990001', '12345'], 'SENHA_CURTA'],
+    [['João', '17999990001', 'x'.repeat(73)], 'SENHA_LONGA'],
+  ]
+  for (const [args, erro] of casos) {
+    igual((await criarConta(...args)).erro, erro, JSON.stringify(args))
+  }
+  igual((await umaK('select count(*)::int as n from public.contas')).n, 0, 'conta inválida gravada')
+})
+
+await teste('conta criada: senha e sessão nunca ficam em texto no banco', async () => {
+  const r = await criarConta('  Maria   Souza ', '(17) 98888-0001', 'minhaSenha1', ' Maria@Email.com ')
+  verdadeiro(r.ok, r.mensagem)
+  verdadeiro(/^[0-9a-f]{64}$/.test(r.sessao.token), 'código de sessão fora do formato')
+  igual(
+    [r.conta.nome, r.conta.telefone, r.conta.email],
+    ['Maria Souza', '17988880001', 'maria@email.com']
+  )
+  const c = await umaK("select senha_hash from public.contas where telefone = '17988880001'")
+  verdadeiro(c.senha_hash.startsWith('$2a$10$'), 'senha sem bcrypt')
+  falso(c.senha_hash.includes('minhaSenha1'), 'senha em texto')
+  const s = await umaK('select count(*)::int as n from public.sessoes_conta where token_hash = $1', [
+    r.sessao.token,
+  ])
+  igual(s.n, 0, 'código de sessão guardado em texto')
+  TOKEN_MARIA = r.sessao.token
+})
+
+await teste('o mesmo número ou e-mail não abre outra conta', async () => {
+  igual((await criarConta('Outra Pessoa', '17988880001', 'segredo1')).erro, 'TELEFONE_JA_CADASTRADO')
+  igual((await criarConta('Outra Pessoa', '+55 (17) 98888-0001', 'segredo1')).erro, 'TELEFONE_JA_CADASTRADO')
+  igual(
+    (await criarConta('Outra Pessoa', '17977770002', 'segredo1', 'MARIA@email.com')).erro,
+    'EMAIL_JA_CADASTRADO'
+  )
+})
+
+await teste('entra com o número ou com o e-mail; senha errada não entra', async () => {
+  const porTel = await rpcK('entrar', ['(17) 98888-0001', 'minhaSenha1'])
+  verdadeiro(porTel.ok, porTel.mensagem)
+  igual(porTel.conta.nome, 'Maria Souza')
+  const porEmail = await rpcK('entrar', ['  MARIA@EMAIL.COM', 'minhaSenha1'])
+  verdadeiro(porEmail.ok, porEmail.mensagem)
+  verdadeiro(porEmail.sessao.token !== porTel.sessao.token, 'sessões iguais')
+
+  igual((await rpcK('entrar', ['17988880001', 'minhasenha1'])).erro, 'LOGIN_INVALIDO')
+  // Número sem conta recebe a MESMA resposta (não denuncia quem tem conta).
+  igual((await rpcK('entrar', ['17911110000', 'minhaSenha1'])).erro, 'LOGIN_INVALIDO')
+  igual((await rpcK('entrar', ['', ''])).erro, 'LOGIN_INVALIDO')
+  // Entrar certo zera as tentativas erradas daquele login.
+  verdadeiro((await rpcK('entrar', ['17988880001', 'minhaSenha1'])).ok)
+  igual((await umaK("select count(*)::int as n from public.tentativas_login where login = '17988880001'")).n, 0)
+})
+
+await teste('5 senhas erradas travam o login por 15 minutos (só daquele número)', async () => {
+  verdadeiro((await criarConta('Pedro Lima', '17977770003', 'certa123')).ok)
+  for (let i = 0; i < 5; i++) {
+    igual((await rpcK('entrar', ['17977770003', `errada${i}`])).erro, 'LOGIN_INVALIDO')
+  }
+  igual((await rpcK('entrar', ['17977770003', 'certa123'])).erro, 'LOGIN_TRAVADO')
+  verdadeiro((await rpcK('entrar', ['maria@email.com', 'minhaSenha1'])).ok, 'travou outra conta')
+
+  await dbk.query(
+    "update public.tentativas_login set created_at = now() - interval '16 minutes' where login = '17977770003'"
+  )
+  verdadeiro((await rpcK('entrar', ['17977770003', 'certa123'])).ok, 'não destravou depois de 15 min')
+})
+
+await teste('"Minha conta" só abre com sessão válida', async () => {
+  igual((await rpcK('minha_conta', ['abc'])).erro, 'SESSAO_EXPIRADA')
+  igual((await rpcK('minha_conta', ['0'.repeat(64)])).erro, 'SESSAO_EXPIRADA')
+  const r = await rpcK('minha_conta', [TOKEN_MARIA])
+  verdadeiro(r.ok, r.mensagem)
+  igual([r.conta.nome, r.proximos, r.anteriores], ['Maria Souza', [], []])
+
+  const vencida = (await rpcK('entrar', ['17988880001', 'minhaSenha1'])).sessao.token
+  await dbk.query(
+    `update public.sessoes_conta set expira_em = now() - interval '1 minute'
+      where token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex')`,
+    [vencida]
+  )
+  igual((await rpcK('minha_conta', [vencida])).erro, 'SESSAO_EXPIRADA')
+})
+
+await teste('agendar logado usa o nome e o número da conta e aparece em "Minha conta"', async () => {
+  const args = [TOKEN_MARIA, CORTE_K.id, DIA_K, '10:00', 'chave-maria-1']
+  const r = await rpcK('criar_agendamento_conta', args)
+  verdadeiro(r.ok, r.mensagem)
+  igual([r.agendamento.cliente, r.agendamento.telefone], ['Maria Souza', '17988880001'])
+  const linha = await umaK(
+    'select a.conta_id, c.telefone as conta_tel from public.agendamentos a join public.contas c on c.id = a.conta_id where a.id = $1',
+    [r.agendamento.id]
+  )
+  igual(linha?.conta_tel, '17988880001', 'agendamento sem a conta')
+
+  igual((await rpcK('minha_conta', [TOKEN_MARIA])).proximos.map((a) => a.id), [r.agendamento.id])
+
+  // Repetir o mesmo pedido (internet caiu) devolve a mesma reserva.
+  const deNovo = await rpcK('criar_agendamento_conta', args)
+  igual([deNovo.ok, deNovo.duplicado, deNovo.agendamento.id], [true, true, r.agendamento.id])
+  AG_MARIA = r.agendamento.id
+})
+
+await teste('cada conta só vê os horários que ela mesma marcou', async () => {
+  const pedro = (await rpcK('entrar', ['17977770003', 'certa123'])).sessao.token
+  const rp = await rpcK('criar_agendamento_conta', [pedro, CORTE_K.id, DIA_K, '11:00', 'chave-pedro-1'])
+  verdadeiro(rp.ok, rp.mensagem)
+
+  // Agendamento sem conta usando o número da Maria: não entra na conta dela.
+  const avulso = await rpcK('criar_agendamento', [CORTE_K.id, DIA_K, '15:00', 'Alguém', '17988880001', null])
+  verdadeiro(avulso.ok, avulso.mensagem)
+
+  igual((await rpcK('minha_conta', [TOKEN_MARIA])).proximos.map((a) => a.id), [AG_MARIA])
+  igual((await rpcK('minha_conta', [pedro])).proximos.map((a) => a.id), [rp.agendamento.id])
+
+  // A chave de outra reserva não devolve os dados dela.
+  igual(
+    (await rpcK('criar_agendamento_conta', [pedro, CORTE_K.id, DIA_K, '10:00', 'chave-maria-1'])).erro,
+    'DADOS_INVALIDOS'
+  )
+})
+
+await teste('agendamento não troca de conta e as regras da agenda continuam valendo', async () => {
+  const pedro = await umaK("select id from public.contas where telefone = '17977770003'")
+  await lancaErro(
+    () => dbk.query('update public.agendamentos set conta_id = $1 where id = $2', [pedro.id, AG_MARIA]),
+    'AGENDAMENTO_IMUTAVEL'
+  )
+  igual(
+    (await rpcK('criar_agendamento_conta', [TOKEN_MARIA, CORTE_K.id, DIA_K, '10:00', 'chave-maria-2'])).erro,
+    'HORARIO_OCUPADO'
+  )
+  igual(
+    (await rpcK('criar_agendamento_conta', ['f'.repeat(64), CORTE_K.id, DIA_K, '16:00', null])).erro,
+    'SESSAO_EXPIRADA'
+  )
+})
+
+await teste('horário que já passou vai para "anteriores"', async () => {
+  const passado = await umaK(
+    `with c as (select id from public.clientes where telefone = '17988880001'),
+          k as (select id from public.contas where telefone = '17988880001'),
+          d as (select ((now() at time zone 'America/Sao_Paulo')::date - 3) as dia)
+     insert into public.agendamentos
+       (cliente_id, cliente_nome, conta_id, servico_id, data, horario_inicio, horario_fim, inicio_em, fim_em,
+        servico_nome, servico_preco, servico_duracao, origem)
+     select c.id, 'Maria Souza', k.id, $1, d.dia, '10:00', '10:35',
+            (d.dia + time '10:00') at time zone 'America/Sao_Paulo',
+            (d.dia + time '10:35') at time zone 'America/Sao_Paulo',
+            'Corte de cabelo', 35, 35, 'site'
+       from c, k, d
+     returning id`,
+    [CORTE_K.id]
+  )
+  const m = await rpcK('minha_conta', [TOKEN_MARIA])
+  igual(m.anteriores.map((a) => a.id), [passado.id])
+  igual(m.proximos.map((a) => a.id), [AG_MARIA])
+})
+
+await teste('sair encerra só a sessão daquele aparelho', async () => {
+  const outra = (await rpcK('entrar', ['maria@email.com', 'minhaSenha1'])).sessao.token
+  verdadeiro((await rpcK('sair', [outra])).ok)
+  igual((await rpcK('minha_conta', [outra])).erro, 'SESSAO_EXPIRADA')
+  verdadeiro((await rpcK('minha_conta', [TOKEN_MARIA])).ok, 'derrubou a outra sessão')
+})
+
+await teste('freio contra robôs: no máximo 20 contas novas em 10 minutos', async () => {
+  const ja = (await umaK("select count(*)::int as n from public.contas where created_at > now() - interval '10 minutes'")).n
+  for (let i = ja; i < 20; i++) {
+    const r = await criarConta(`Robô ${i}`, `179666${String(i).padStart(5, '0')}`, 'segredo1')
+    verdadeiro(r.ok, r.mensagem)
+  }
+  igual((await criarConta('Robô extra', '17955550000', 'segredo1')).erro, 'MUITAS_CONTAS')
+})
+
+await dbk.close()
+
+// =====================================================================
 const falhas = relatorio()
 await db.close()
 process.exit(falhas > 0 ? 1 : 0)
