@@ -19,6 +19,7 @@ import {
 import { apagarSessao, lerSessao, salvarSessao, type SessaoSalva } from '../lib/sessaoSalva'
 import { esquecerCliente, salvarCliente } from '../lib/clienteSalvo'
 import { MSG_CONTA_FALHA, MSG_CONTA_SEM_CONEXAO, pareceFalhaDeRede } from '../lib/erros'
+import { desligarLembretes, sincronizarLembretes } from '../lib/avisosCliente'
 
 export type ResultadoConta = { ok: true } | { ok: false; erro?: string; mensagem: string }
 
@@ -51,6 +52,8 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
   const tokenRef = useRef<string | null>(sessao?.token ?? null)
   // Só a busca mais recente pode mexer na tela (entrar/sair no meio dela).
   const pedidoRef = useRef(0)
+  // O cadastro do aparelho para os lembretes é conferido uma vez por abertura.
+  const lembretesConferidos = useRef(false)
 
   const aplicarSessao = useCallback((nova: SessaoSalva | null) => {
     tokenRef.current = nova?.token ?? null
@@ -82,6 +85,10 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
         setProximos(r.proximos)
         setAnteriores(r.anteriores)
         aplicarSessao({ token, conta: r.conta })
+        if (!lembretesConferidos.current) {
+          lembretesConferidos.current = true
+          void sincronizarLembretes(token).catch(() => {})
+        }
       } else if (r.erro === 'SESSAO_EXPIRADA') {
         aplicarSessao(null)
       } else {
@@ -128,8 +135,12 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
     const token = tokenRef.current
     aplicarSessao(null)
     esquecerCliente()
-    // Se a internet falhar aqui, a sessão vence sozinha no servidor.
-    if (token) sairDaConta(token).catch(() => {})
+    // Este aparelho para de receber os lembretes da conta; depois encerra a sessão.
+    if (token) {
+      void desligarLembretes(token).finally(() => {
+        sairDaConta(token).catch(() => {})
+      })
+    }
   }, [aplicarSessao])
 
   const sessaoExpirou = useCallback(() => aplicarSessao(null), [aplicarSessao])

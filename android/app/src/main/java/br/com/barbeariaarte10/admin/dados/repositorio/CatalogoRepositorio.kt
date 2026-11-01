@@ -11,6 +11,8 @@ import br.com.barbeariaarte10.admin.dados.modelo.ConfigBarbearia
 import br.com.barbeariaarte10.admin.dados.modelo.HorarioFuncionamento
 import br.com.barbeariaarte10.admin.dados.modelo.Plano
 import br.com.barbeariaarte10.admin.dados.modelo.PlanoEdicao
+import br.com.barbeariaarte10.admin.dados.modelo.Promocao
+import br.com.barbeariaarte10.admin.dados.modelo.PromocaoEdicao
 import br.com.barbeariaarte10.admin.dados.modelo.RespostaSimples
 import br.com.barbeariaarte10.admin.dados.modelo.Servico
 import br.com.barbeariaarte10.admin.dados.modelo.ServicoEdicao
@@ -122,6 +124,48 @@ class CatalogoRepositorio {
                     set("ordem", plano.ordem)
                 },
             ) {
+                filter { eq("id", id) }
+            }
+        }
+
+    // ------------------------------------------------------ promoções
+
+    /** Promoções do site (ativas e escondidas), na ordem do site. */
+    suspend fun promocoes(): Resultado<List<Promocao>> = executar {
+        supabase.from("promocoes")
+            .select {
+                order("ordem", Order.ASCENDING)
+                order("titulo", Order.ASCENDING)
+            }
+            .decodeList<Promocao>()
+    }
+
+    suspend fun criarPromocao(promocao: PromocaoEdicao): Resultado<Unit> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.from("promocoes").insert(promocao)
+        }
+
+    suspend fun atualizarPromocao(id: String, promocao: PromocaoEdicao): Resultado<Unit> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            // Campo a campo, com null explícito, para apagar um texto de verdade.
+            supabase.from("promocoes").update(
+                {
+                    set("titulo", promocao.titulo)
+                    set("chamada", promocao.chamada)
+                    set("descricao", promocao.descricao)
+                    set("itens", promocao.itens)
+                    set("observacao", promocao.observacao)
+                    set("ativo", promocao.ativo)
+                    set("ordem", promocao.ordem)
+                },
+            ) {
+                filter { eq("id", id) }
+            }
+        }
+
+    suspend fun excluirPromocao(id: String): Resultado<Unit> =
+        executar(MSG_FALHA_SALVAR, MSG_NAO_SALVO_SEM_CONEXAO) {
+            supabase.from("promocoes").delete {
                 filter { eq("id", id) }
             }
         }

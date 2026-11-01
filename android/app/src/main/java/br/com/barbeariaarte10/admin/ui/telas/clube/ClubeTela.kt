@@ -49,6 +49,8 @@ import br.com.barbeariaarte10.admin.core.Resultado
 import br.com.barbeariaarte10.admin.dados.modelo.AssinaturaResumo
 import br.com.barbeariaarte10.admin.dados.modelo.Plano
 import br.com.barbeariaarte10.admin.dados.modelo.PlanoEdicao
+import br.com.barbeariaarte10.admin.dados.modelo.Promocao
+import br.com.barbeariaarte10.admin.dados.modelo.PromocaoEdicao
 import br.com.barbeariaarte10.admin.ui.componentes.CartaoArte10
 import br.com.barbeariaarte10.admin.ui.componentes.EstadoVazio
 import br.com.barbeariaarte10.admin.ui.componentes.Etiqueta
@@ -70,6 +72,8 @@ data class EstadoClube(
     val carregando: Boolean = true,
     val assinaturas: List<AssinaturaResumo> = emptyList(),
     val planos: List<Plano> = emptyList(),
+    /** Promoções do site (o dono edita por aqui). */
+    val promocoes: List<Promocao> = emptyList(),
     /** Preço do serviço que desconta do plano: base da conta de economia. */
     val precoCorte: Double? = null,
     val erro: String? = null,
@@ -93,6 +97,8 @@ class ClubeViewModel : ViewModel() {
         viewModelScope.launch {
             val planos = Grafo.catalogo.planos()
             if (planos is Resultado.Sucesso) _estado.update { it.copy(planos = planos.dado) }
+            val promocoes = Grafo.catalogo.promocoes()
+            if (promocoes is Resultado.Sucesso) _estado.update { it.copy(promocoes = promocoes.dado) }
             val servicos = Grafo.catalogo.servicos()
             if (servicos is Resultado.Sucesso) {
                 val corte = servicos.dado.firstOrNull { it.usaPlano && it.ativo } ?: servicos.dado.firstOrNull { it.usaPlano }
@@ -118,6 +124,39 @@ class ClubeViewModel : ViewModel() {
             when (r) {
                 is Resultado.Sucesso -> {
                     _estado.update { it.copy(processando = false, aviso = "Plano salvo. Já aparece assim no site.") }
+                    carregar()
+                    aoTerminar()
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
+
+    /** Cria (id nulo) ou edita uma promoção do site. */
+    fun salvarPromocao(id: String?, dados: PromocaoEdicao, aoTerminar: () -> Unit) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            val r = if (id == null) Grafo.catalogo.criarPromocao(dados) else Grafo.catalogo.atualizarPromocao(id, dados)
+            when (r) {
+                is Resultado.Sucesso -> {
+                    val texto = if (dados.ativo) "Promoção salva. Já aparece assim no site." else "Promoção salva (escondida do site)."
+                    _estado.update { it.copy(processando = false, aviso = texto) }
+                    carregar()
+                    aoTerminar()
+                }
+                is Resultado.Falha -> _estado.update { it.copy(processando = false, aviso = r.mensagem) }
+            }
+        }
+    }
+
+    fun excluirPromocao(promocao: Promocao, aoTerminar: () -> Unit) {
+        if (_estado.value.processando) return
+        _estado.update { it.copy(processando = true, aviso = null) }
+        viewModelScope.launch {
+            when (val r = Grafo.catalogo.excluirPromocao(promocao.id)) {
+                is Resultado.Sucesso -> {
+                    _estado.update { it.copy(processando = false, aviso = "${promocao.titulo} excluída.") }
                     carregar()
                     aoTerminar()
                 }
@@ -199,6 +238,8 @@ fun ClubeTela(
     var editandoPlano by remember { mutableStateOf<Plano?>(null) }
     var criandoPlano by remember { mutableStateOf(false) }
     var limpandoEncerrados by remember { mutableStateOf(false) }
+    var editandoPromocao by remember { mutableStateOf<Promocao?>(null) }
+    var criandoPromocao by remember { mutableStateOf(false) }
 
     LaunchedEffect(online) { if (online) modelo.carregar() }
 
@@ -245,6 +286,31 @@ fun ClubeTela(
 
         items(estado.planos, key = { "plano-${it.id}" }) { plano ->
             CartaoPlano(plano = plano, precoCorte = estado.precoCorte, aoEditar = { editandoPlano = plano })
+        }
+
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Subtitulo("Promoções no site")
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { criandoPromocao = true }, modifier = Modifier.padding(top = 10.dp)) {
+                    Icon(Icons.Outlined.Add, contentDescription = null, tint = Ouro)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Nova promoção", color = Ouro)
+                }
+            }
+        }
+
+        if (!estado.carregando && estado.promocoes.isEmpty()) {
+            item {
+                EstadoVazio(
+                    titulo = "Nenhuma promoção ainda",
+                    descricao = "Crie uma e ela aparece na aba Clube do site.",
+                )
+            }
+        }
+
+        items(estado.promocoes, key = { "promo-${it.id}" }) { promocao ->
+            CartaoPromocao(promocao = promocao, aoEditar = { editandoPromocao = promocao })
         }
 
         if (!estado.carregando && estado.erro == null && estado.assinaturas.isEmpty()) {
@@ -327,6 +393,32 @@ fun ClubeTela(
                 modelo.salvarPlano(editandoPlano?.id, dados) {
                     criandoPlano = false
                     editandoPlano = null
+                }
+            },
+        )
+    }
+
+    if (criandoPromocao || editandoPromocao != null) {
+        DialogoPromocao(
+            promocao = editandoPromocao,
+            proximaOrdem = (estado.promocoes.maxOfOrNull { it.ordem } ?: 0) + 1,
+            salvando = estado.processando,
+            aoFechar = {
+                criandoPromocao = false
+                editandoPromocao = null
+            },
+            aoExcluir = editandoPromocao?.let { promocao ->
+                {
+                    modelo.excluirPromocao(promocao) {
+                        criandoPromocao = false
+                        editandoPromocao = null
+                    }
+                }
+            },
+            aoSalvar = { dados ->
+                modelo.salvarPromocao(editandoPromocao?.id, dados) {
+                    criandoPromocao = false
+                    editandoPromocao = null
                 }
             },
         )
@@ -552,6 +644,38 @@ private fun CartaoPlano(plano: Plano, precoCorte: Double?, aoEditar: () -> Unit)
             }
             IconButton(onClick = aoEditar) {
                 Icon(Icons.Outlined.Edit, contentDescription = "Editar ${plano.nome}", tint = TextoSuave)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartaoPromocao(promocao: Promocao, aoEditar: () -> Unit) {
+    CartaoArte10 {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    promocao.titulo,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (promocao.ativo) MaterialTheme.colorScheme.onBackground else TextoFraco,
+                )
+                promocao.chamada?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = TextoSuave)
+                }
+                if (promocao.itens.isNotEmpty()) {
+                    Text(
+                        promocao.itens.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextoFraco,
+                    )
+                }
+                if (!promocao.ativo) {
+                    Spacer(Modifier.height(6.dp))
+                    Etiqueta(texto = "Escondida do site", cor = TextoFraco)
+                }
+            }
+            IconButton(onClick = aoEditar) {
+                Icon(Icons.Outlined.Edit, contentDescription = "Editar ${promocao.titulo}", tint = TextoSuave)
             }
         }
     }

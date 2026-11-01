@@ -274,6 +274,44 @@ export async function carregarMinhaConta(token: string): Promise<RespostaMinhaCo
   return r
 }
 
+/**
+ * O cliente cancela o próprio horário. O banco só aceita até 40 minutos
+ * antes; depois disso a resposta pede para falar com a barbearia.
+ */
+export async function cancelarMeuAgendamento(
+  token: string,
+  agendamentoId: string,
+): Promise<{ ok: true } | { ok: false; erro: string; mensagem: string }> {
+  const { data, error } = await supabase.rpc('cancelar_meu_agendamento', {
+    p_token: token,
+    p_agendamento_id: agendamentoId,
+  })
+  if (error) throw error
+  return data as { ok: true } | { ok: false; erro: string; mensagem: string }
+}
+
+/** Liga os lembretes (Web Push) deste aparelho para a conta. */
+export async function registrarAparelhoConta(
+  token: string,
+  endpoint: string,
+  p256dh: string,
+  auth: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('registrar_aparelho_conta', {
+    p_token: token,
+    p_endpoint: endpoint,
+    p_p256dh: p256dh,
+    p_auth: auth,
+  })
+  if (error) throw error
+  return Boolean((data as { ok?: boolean })?.ok)
+}
+
+export async function removerAparelhoConta(token: string, endpoint: string): Promise<void> {
+  const { error } = await supabase.rpc('remover_aparelho_conta', { p_token: token, p_endpoint: endpoint })
+  if (error) throw error
+}
+
 /** Plano (pedido, ativo ou recém-encerrado) ligado a um telefone. */
 export async function consultarMeuPlano(telefone: string): Promise<Assinatura | null> {
   const { data, error } = await supabase.rpc('meu_plano', { p_telefone: telefone })

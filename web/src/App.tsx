@@ -16,6 +16,7 @@ import { ModalAgendamento } from './componentes/agendamento/ModalAgendamento'
 import { ModalConta } from './componentes/conta/ModalConta'
 import { IconeAlerta } from './componentes/Icones'
 import { useConta } from './hooks/useConta'
+import { AvisoProximoHorario } from './componentes/conta/AvisoProximoHorario'
 
 export default function App() {
   const { config, servicos, funcionamento, carregando, erro, recarregar } = useDadosDaBarbearia()
@@ -53,6 +54,13 @@ export default function App() {
   const fecharConta = () => setContaAberta(false)
 
   const irPara = (indice: number) => setAba(Math.max(0, Math.min(total - 1, indice)))
+
+  // Acabou de entrar ou criar a conta: vai direto para os serviços.
+  const tinhaConta = useRef(Boolean(conta))
+  useEffect(() => {
+    if (conta && !tinhaConta.current) setAba(indiceDaAba('servicos'))
+    tinhaConta.current = Boolean(conta)
+  }, [conta])
 
   // A aba vai para o endereço (#servicos): o link compartilhado abre na aba certa.
   useEffect(() => {
@@ -134,6 +142,11 @@ export default function App() {
       <main className="palco" onTouchStart={aoTocar} onTouchEnd={aoSoltar}>
         <div className="trilho" style={{ transform: `translateX(-${aba * 100}%)` }}>
           <section {...painel('inicio')}>
+            {conta && (
+              <div className="container" style={{ paddingTop: 16 }}>
+                <AvisoProximoHorario fuso={config?.fuso} aoAbrir={abrirConta} />
+              </div>
+            )}
             <Hero
               config={config}
               funcionamento={funcionamento}

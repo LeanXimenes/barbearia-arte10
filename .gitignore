@@ -5,6 +5,7 @@ node_modules/
 
 # Build
 dist/
+dist-painel/
 build/
 .vite/
 *.tsbuildinfo
@@ -44,3 +45,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Chaves dos avisos do iPhone (a privada só vai para o Supabase)
+supabase/chaves-iphone.local.txt

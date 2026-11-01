@@ -244,3 +244,58 @@ data class Administrador(
     val nome: String,
     val ativo: Boolean,
 )
+
+// ------------------------------------------- tela inicial: próximos dias
+
+/** Horário marcado de hoje em diante (só o que ainda não terminou). */
+@Serializable
+data class ProximoAgendamento(
+    val id: String,
+    val data: String,
+    @SerialName("horario_inicio") val horarioInicio: String,
+    @SerialName("horario_fim") val horarioFim: String,
+    @SerialName("inicio_em") val inicioEm: String,
+    @SerialName("fim_em") val fimEm: String,
+    @SerialName("cliente_nome") val clienteNome: String,
+    @SerialName("cliente_telefone") val clienteTelefone: String,
+    @SerialName("servico_nome") val servicoNome: String,
+    @SerialName("servico_preco") val servicoPreco: Double = 0.0,
+    @SerialName("duracao_minutos") val duracaoMinutos: Int = 0,
+    val status: String = "agendado",
+    @SerialName("em_andamento") val emAndamento: Boolean = false,
+)
+
+@Serializable
+data class ProximosAgendamentos(
+    val ok: Boolean = false,
+    val erro: String? = null,
+    val mensagem: String? = null,
+    val hoje: String? = null,
+    val agendamentos: List<ProximoAgendamento> = emptyList(),
+)
+
+// --------------------------------------------------------- promoções
+
+/** Promoção do site (o dono cria, edita, esconde e apaga pelo app). */
+@Serializable
+data class Promocao(
+    val id: String,
+    val titulo: String,
+    val chamada: String? = null,
+    val descricao: String? = null,
+    val itens: List<String> = emptyList(),
+    val observacao: String? = null,
+    val ativo: Boolean = true,
+    val ordem: Int = 0,
+)
+
+@Serializable
+data class PromocaoEdicao(
+    val titulo: String,
+    val chamada: String? = null,
+    val descricao: String? = null,
+    val itens: List<String> = emptyList(),
+    val observacao: String? = null,
+    val ativo: Boolean = true,
+    val ordem: Int = 0,
+)

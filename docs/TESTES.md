@@ -3,7 +3,7 @@
 ## Como rodar
 
 ```powershell
-# Banco (126), push (9) e instalador (5)
+# Banco (136), push do Android (9), avisos do iPhone (6) e instalador (5)
 cd C:\arte10\supabase\tests
 npm install
 npm test

@@ -62,6 +62,7 @@ as $$
     when 'LOGIN_INVALIDO'       then 'Número, e-mail ou senha incorretos.'
     when 'LOGIN_TRAVADO'        then 'Muitas tentativas com a senha errada. Espere 15 minutos e tente de novo.'
     when 'SESSAO_EXPIRADA'      then 'Sua sessão terminou. Entre de novo na sua conta.'
+    when 'CANCELAMENTO_CLIENTE_TARDE' then 'Só dá para cancelar até 40 minutos antes do horário. Agora, fale com a barbearia pelo WhatsApp.'
     else 'Não foi possível concluir a operação. Tente novamente.'
   end;
 $$;

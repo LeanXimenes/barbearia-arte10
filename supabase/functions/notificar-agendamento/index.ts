@@ -13,6 +13,11 @@
 //   FIREBASE_PRIVATE_KEY    — private_key da conta de serviço (com \n)
 //   EDGE_TOKEN              — o mesmo valor gravado por supabase/ativar_push.sql
 //
+// Para os avisos no iPhone (painel web instalado na Tela de Início):
+//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — geradas por supabase/gerar_chaves_iphone.mjs
+//   VAPID_SUBJECT                       — "mailto:" de contato (opcional)
+// Os do Firebase só são exigidos quando há aparelho Android registrado.
+//
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetados pela plataforma.
 // A service_role key vive somente aqui, no servidor.
 // =====================================================================
@@ -27,6 +32,12 @@ import {
   montarMensagem,
   statusFinal,
 } from './fcm.ts'
+import {
+  type ChavesVapid,
+  classificarRespostaWebPush,
+  lerChavesVapid,
+  montarPedidoWebPush,
+} from './webpush.ts'
 
 const FCM_ESCOPO = 'https://www.googleapis.com/auth/firebase.messaging'
 
@@ -116,6 +127,38 @@ function json(corpo: unknown, status = 200): Response {
 }
 
 // ---------------------------------------------------------------------
+// Web Push para uma lista de aparelhos (iPhone do dono ou do cliente)
+// ---------------------------------------------------------------------
+interface AparelhoWeb {
+  id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+}
+
+async function enviarWebPush(aparelhos: AparelhoWeb[], notificacao: NotificacaoReservada, chaves: ChavesVapid) {
+  const classes: ClasseResposta[] = []
+  const invalidos: string[] = []
+  const erros: string[] = []
+  for (const aparelho of aparelhos) {
+    try {
+      const pedido = await montarPedidoWebPush(aparelho, notificacao, chaves)
+      const resposta = await fetch(pedido.url, pedido.init)
+      const texto = resposta.ok ? '' : await resposta.text()
+      const classe = classificarRespostaWebPush(resposta.status)
+      classes.push(classe)
+      if (classe === 'token_invalido') invalidos.push(aparelho.id)
+      if (classe !== 'entregue') erros.push(`web ${resposta.status}: ${texto.slice(0, 150)}`)
+    } catch (erro) {
+      // Assinatura corrompida ou rede: não derruba os outros aparelhos.
+      classes.push('passageiro')
+      erros.push(`web: ${erro instanceof Error ? erro.message : String(erro)}`.slice(0, 150))
+    }
+  }
+  return { classes, invalidos, erros }
+}
+
+// ---------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ erro: 'Método não permitido' }, 405)
@@ -158,37 +201,85 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Lembrete do CLIENTE: só os aparelhos da conta dele (Web Push).
+    const contaCliente =
+      notificacao.dados?.destino === 'cliente' && typeof notificacao.dados?.conta_id === 'string'
+        ? (notificacao.dados.conta_id as string)
+        : null
+    if (contaCliente) {
+      const { data, error } = await supabase.rpc('destinos_web_conta', { p_conta_id: contaCliente })
+      if (error) throw new Error(`destinos_web_conta: ${error.message}`)
+      const aparelhos = (data ?? []) as AparelhoWeb[]
+      if (aparelhos.length === 0) {
+        await finalizar('falhou', 'O cliente não tem aparelho com os avisos ligados.')
+        return json({ ok: false, motivo: 'sem_aparelhos' })
+      }
+      const chaves = lerChavesVapid((nome) => Deno.env.get(nome))
+      if (!chaves) throw new ErroDeConfiguracao('VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY não configurados.')
+
+      const r = await enviarWebPush(aparelhos, notificacao, chaves)
+      if (r.invalidos.length > 0) {
+        const { error: e } = await supabase.rpc('desativar_aparelhos_conta', { p_ids: r.invalidos })
+        if (e) console.error('desativar_aparelhos_conta:', e.message)
+      }
+      const status = statusFinal(r.classes)
+      await finalizar(status, status === 'enviada' ? null : r.erros.join(' | ').slice(0, 500))
+      return json({ ok: status === 'enviada', status })
+    }
+
+    // Android (Firebase).
     const { data: destinos, error: erroDestinos } = await supabase.rpc('destinos_push')
     if (erroDestinos) throw new Error(`destinos_push: ${erroDestinos.message}`)
-
     const lista = (destinos ?? []) as Array<{ id: string; token: string }>
-    if (lista.length === 0) {
+
+    // iPhone e navegadores do dono (Web Push). Banco ainda sem a função: só Android.
+    const { data: destinosWeb, error: erroWeb } = await supabase.rpc('destinos_web_push')
+    if (erroWeb) console.warn('destinos_web_push:', erroWeb.message)
+    const listaWeb = (erroWeb ? [] : destinosWeb ?? []) as AparelhoWeb[]
+
+    if (lista.length === 0 && listaWeb.length === 0) {
       await finalizar('pendente', 'Nenhum aparelho do barbeiro registrado (abra o app uma vez).')
       return json({ ok: false, motivo: 'sem_aparelhos' })
     }
-
-    const projeto = Deno.env.get('FIREBASE_PROJECT_ID')?.trim()
-    if (!projeto) throw new ErroDeConfiguracao('FIREBASE_PROJECT_ID não configurado.')
-    const url = `https://fcm.googleapis.com/v1/projects/${projeto}/messages:send`
-    const accessToken = await obterAccessToken()
 
     const classes: ClasseResposta[] = []
     const invalidos: string[] = []
     const erros: string[] = []
 
-    for (const destino of lista) {
-      const resposta = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(montarMensagem(destino.token, notificacao)),
-      })
-      const texto = resposta.ok ? '' : await resposta.text()
-      const classe = classificarRespostaFcm(resposta.status, texto)
-      classes.push(classe)
+    if (lista.length > 0) {
+      const projeto = Deno.env.get('FIREBASE_PROJECT_ID')?.trim()
+      if (!projeto) throw new ErroDeConfiguracao('FIREBASE_PROJECT_ID não configurado.')
+      const url = `https://fcm.googleapis.com/v1/projects/${projeto}/messages:send`
+      const accessToken = await obterAccessToken()
 
-      if (classe === 'token_invalido') invalidos.push(destino.id)
-      if (classe !== 'entregue') erros.push(`${resposta.status}: ${texto.slice(0, 150)}`)
-      if (resposta.status === 401) tokenEmCache = null
+      for (const destino of lista) {
+        const resposta = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(montarMensagem(destino.token, notificacao)),
+        })
+        const texto = resposta.ok ? '' : await resposta.text()
+        const classe = classificarRespostaFcm(resposta.status, texto)
+        classes.push(classe)
+
+        if (classe === 'token_invalido') invalidos.push(destino.id)
+        if (classe !== 'entregue') erros.push(`${resposta.status}: ${texto.slice(0, 150)}`)
+        if (resposta.status === 401) tokenEmCache = null
+      }
+    }
+
+    if (listaWeb.length > 0) {
+      const chaves = lerChavesVapid((nome) => Deno.env.get(nome))
+      if (!chaves) {
+        // Sem as chaves o iPhone não recebe, mas o Android segue normal.
+        classes.push('permanente')
+        erros.push('VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY não configurados (avisos do iPhone).')
+      } else {
+        const r = await enviarWebPush(listaWeb, notificacao, chaves)
+        classes.push(...r.classes)
+        invalidos.push(...r.invalidos)
+        erros.push(...r.erros)
+      }
     }
 
     if (invalidos.length > 0) {

@@ -322,3 +322,140 @@
   background: rgba(154, 168, 198, 0.1);
   border-color: var(--borda-suave);
 }
+
+/* Cancelar e lembrete (Minha conta) ---------------------------------- */
+
+.horario-conta__cancelar {
+  align-self: flex-start;
+  margin-top: 6px;
+  font-size: 0.84rem;
+}
+
+.horario-conta__tarde {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #ffe9b8;
+}
+
+.conta__regra {
+  display: block;
+  margin-top: 10px;
+}
+
+.conta__lembretes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--raio-sm);
+  border: 1px solid rgba(233, 200, 79, 0.4);
+  background: rgba(233, 200, 79, 0.08);
+  color: var(--ouro-300);
+  font-size: 0.86rem;
+}
+
+.conta__lembretes--ativo {
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.07);
+  color: #bbf7d0;
+}
+
+.conta__lembretes-texto {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--texto-suave);
+  line-height: 1.45;
+}
+
+.conta__lembretes-texto strong {
+  color: var(--texto);
+}
+
+.conta__lembretes .botao {
+  width: 100%;
+}
+
+.conta__confirmar {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--texto);
+}
+
+.conta__botao-cancelar {
+  background: rgba(251, 113, 133, 0.16);
+  border: 1px solid rgba(251, 113, 133, 0.5);
+  color: #ffd9de;
+}
+
+/* Aviso do próximo horário na tela inicial --------------------------- */
+
+.aviso-horario {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 0 auto 18px;
+  max-width: 560px;
+  padding: 14px 16px;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  background: linear-gradient(135deg, rgba(233, 200, 79, 0.16), rgba(233, 200, 79, 0.05));
+  text-align: left;
+  color: var(--texto);
+  box-shadow: var(--sombra-suave);
+}
+
+.aviso-horario__data {
+  width: 52px;
+  flex-shrink: 0;
+  padding: 7px 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
+  color: #1a1204;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.aviso-horario__dia {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.aviso-horario__mes {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.aviso-horario__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.86rem;
+  color: var(--texto-suave);
+}
+
+.aviso-horario__rotulo {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ouro-400);
+}
+
+.aviso-horario__principal {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--texto);
+}

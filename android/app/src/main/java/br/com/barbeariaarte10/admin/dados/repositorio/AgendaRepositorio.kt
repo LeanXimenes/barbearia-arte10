@@ -9,6 +9,7 @@ import br.com.barbeariaarte10.admin.core.executar
 import br.com.barbeariaarte10.admin.dados.modelo.AgendaDoDia
 import br.com.barbeariaarte10.admin.dados.modelo.AgendamentoHistorico
 import br.com.barbeariaarte10.admin.dados.modelo.DiaCalendario
+import br.com.barbeariaarte10.admin.dados.modelo.ProximosAgendamentos
 import br.com.barbeariaarte10.admin.dados.modelo.RespostaSimples
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -50,6 +51,13 @@ class AgendaRepositorio {
         supabase.postgrest
             .rpc("agenda_do_dia", buildJsonObject { put("p_data", data.toString()) })
             .decodeAs<AgendaDoDia>()
+    }
+
+    /** Hoje e os próximos dias já marcados (tela inicial), com o telefone do cliente. */
+    suspend fun proximosAgendamentos(dias: Int = 7): Resultado<ProximosAgendamentos> = executar {
+        supabase.postgrest
+            .rpc("proximos_agendamentos", buildJsonObject { put("p_dias", dias) })
+            .decodeAs<ProximosAgendamentos>()
     }
 
     /** Resumo por dia para pintar o calendário. */

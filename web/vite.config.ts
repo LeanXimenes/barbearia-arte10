@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -14,15 +15,47 @@ function enderecoDoSite(): Plugin {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), enderecoDoSite()],
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    target: 'es2020',
-  },
-  server: {
-    port: 5173,
-    host: true,
-  },
+/**
+ * Site do painel do dono (outro endereço no Netlify): a raiz leva direto
+ * para /admin/ (onde ficam o painel, o service worker e o manifesto).
+ */
+function raizDoPainel(): Plugin {
+  return {
+    name: 'arte10-raiz-do-painel',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: '_redirects', source: '/  /admin/  302\n' })
+      this.emitFile({
+        type: 'asset',
+        fileName: 'index.html',
+        source:
+          '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
+          '<meta http-equiv="refresh" content="0; url=/admin/"><title>Painel · Arte 10</title>' +
+          '<meta name="robots" content="noindex"></head>' +
+          '<body><a href="/admin/">Abrir o painel</a><script>location.replace("/admin/")</script></body></html>\n',
+      })
+    },
+  }
+}
+
+const caminho = (arquivo: string) => fileURLToPath(new URL(arquivo, import.meta.url))
+
+// "npm run build"        -> dist/        só o site dos clientes
+// "npm run build:painel" -> dist-painel/ só o painel do dono (outro site no Netlify)
+export default defineConfig(({ mode }) => {
+  const painel = mode === 'painel'
+  return {
+    plugins: [react(), enderecoDoSite(), ...(painel ? [raizDoPainel()] : [])],
+    build: {
+      outDir: painel ? 'dist-painel' : 'dist',
+      sourcemap: false,
+      target: 'es2020',
+      rollupOptions: {
+        input: painel ? { painel: caminho('./admin/index.html') } : { site: caminho('./index.html') },
+      },
+    },
+    server: {
+      port: 5173,
+      host: true,
+    },
+  }
 })

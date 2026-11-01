@@ -206,6 +206,8 @@ agendamentos, clientes nem os seus dados**.
    where telefone = '17999990000';
   ```
 
+Painel do iPhone, avisos e lembretes de 30 minutos: veja [PAINEL_E_AVISOS.md](PAINEL_E_AVISOS.md).
+
 ## Mapa do banco
 
 ### Tabelas
@@ -226,6 +228,8 @@ agendamentos, clientes nem os seus dados**.
 | `contas` | Conta do cliente no site: nome, celular (único), e-mail (opcional) e o hash da senha. Sem acesso pela API. |
 | `sessoes_conta` | Aparelhos logados. Só o hash do código de cada sessão. Sem acesso pela API. |
 | `tentativas_login` | Senhas erradas recentes (para travar quem fica chutando). Sem acesso pela API. |
+| `aparelhos_conta` | Celulares dos clientes que ligaram o lembrete (Web Push). Sem acesso pela API. |
+| `lembretes_enviados` | Que lembretes de 30 min já saíram (para não repetir). Sem acesso pela API. |
 
 ### Funções
 
@@ -237,6 +241,11 @@ agendamentos, clientes nem os seus dados**.
 | `criar_conta(nome, celular, senha, e-mail)` / `entrar(celular ou e-mail, senha)` / `sair(sessão)` | site | Conta do cliente. Devolvem a sessão. |
 | `minha_conta(sessão)` | site | Dados da conta e os horários marcados por ela. |
 | `criar_agendamento_conta(sessão, ...)` | site | Agenda com o nome e o número da conta (mesmas regras de `criar_agendamento`). |
+| `cancelar_meu_agendamento(sessão, id)` | site | O cliente cancela até 40 min antes; o dono recebe um aviso. |
+| `registrar_aparelho_conta(sessão, ...)` | site | Liga o lembrete de 30 min no celular do cliente (Web Push). |
+| `proximos_agendamentos(dias)` | app e painel | Hoje e os próximos dias já marcados, com o telefone do cliente. |
+| `registrar_dispositivo_web(...)` | painel | Liga os avisos no iPhone do dono (Web Push). |
+| `enviar_lembretes()` | pg_cron | Lembrete 30 min antes, para o dono e para o cliente (uma vez só). |
 | `agenda_do_dia(data)` | app | Linha do tempo: agendado / bloqueado / livre (na mesma grade do site) / intervalo. |
 | `visao_geral_periodo(início, fim)` | app | Contagens por dia para o calendário. |
 | `criar_bloqueio(...)` / `remover_bloqueio(id)` | app | Fecha / libera um período. Nunca toca em agendamento de cliente. |

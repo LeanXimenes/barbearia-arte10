@@ -248,7 +248,8 @@ as $$
   select d.id, d.token
     from public.dispositivos_push d
     join public.administradores a on a.user_id = d.user_id and a.ativo
-   where d.ativo;
+   -- Só os do Firebase (Android). Os do iPhone saem em destinos_web_push().
+   where d.ativo and d.plataforma <> 'web';
 $$;
 
 -- Tokens que o FCM declarou mortos (app desinstalado, token trocado).

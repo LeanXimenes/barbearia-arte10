@@ -26,7 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -118,6 +120,8 @@ private fun AppConectado(dataPedida: String?, aoConsumirData: () -> Unit) {
     // O fluxo é lembrado: recriá-lo a cada recomposição registraria e
     // removeria o callback de rede o tempo todo.
     val fluxoConexao = remember { Grafo.conectividade.observar() }
+    // Dia escolhido na tela inicial (o aviso tocado usa o dataPedida).
+    var diaDaInicio by remember { mutableStateOf<String?>(null) }
     val online by fluxoConexao.collectAsStateWithLifecycle(initialValue = Grafo.conectividade.estaOnline())
 
     LaunchedEffect(dataPedida) {
@@ -176,15 +180,22 @@ private fun AppConectado(dataPedida: String?, aoConsumirData: () -> Unit) {
                 composable(Rota.Inicio.caminho) {
                     InicioTela(
                         online = online,
-                        aoAbrirAgenda = { navegador.navigate(Rota.Agenda.caminho) },
+                        aoAbrirAgenda = { dia ->
+                            // Tocar num horário abre a agenda naquele dia.
+                            diaDaInicio = dia
+                            navegador.navigate(Rota.Agenda.caminho)
+                        },
                         aoAbrirHistorico = { navegador.navigate(Rota.Historico.caminho) },
                     )
                 }
                 composable(Rota.Agenda.caminho) {
                     AgendaTela(
                         online = online,
-                        dataInicial = dataPedida,
-                        aoUsarDataInicial = aoConsumirData,
+                        dataInicial = dataPedida ?: diaDaInicio,
+                        aoUsarDataInicial = {
+                            aoConsumirData()
+                            diaDaInicio = null
+                        },
                     )
                 }
                 composable(Rota.Clientes.caminho) {

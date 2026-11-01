@@ -38,6 +38,8 @@ begin
       '*/2 * * * *',
       'select public.reenviar_notificacoes_pendentes(20)'
     );
+    -- Lembretes 30 minutos antes do horário (dono e cliente).
+    perform cron.schedule('arte10-lembretes', '* * * * *', 'select public.enviar_lembretes()');
   else
     raise exception 'Habilite a extensão pg_cron em Database > Extensions e rode de novo.';
   end if;

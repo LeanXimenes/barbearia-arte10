@@ -1805,6 +1805,200 @@ await teste('freio contra robôs: no máximo 20 contas novas em 10 minutos', asy
 await dbk.close()
 
 // =====================================================================
+grupo('Painel do iPhone: avisos por Web Push')
+// =====================================================================
+const dbw = await criarBanco()
+const umaW = async (sql, params = []) => (await dbw.query(sql, params)).rows[0]
+const todasW = async (sql, params = []) => (await dbw.query(sql, params)).rows
+const ID_DONO_W = randomUUID()
+const ID_IRMAO_W = randomUUID()
+const ID_COMUM_W = randomUUID()
+await dbw.query(
+  "insert into auth.users (id, email) values ($1, 'dono@w.test'), ($2, 'irmao@w.test'), ($3, 'comum@w.test')",
+  [ID_DONO_W, ID_IRMAO_W, ID_COMUM_W]
+)
+await dbw.query(
+  "insert into public.administradores (user_id, nome) values ($1, 'Dono'), ($2, 'Irmão')",
+  [ID_DONO_W, ID_IRMAO_W]
+)
+const P256DH = 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4'
+const AUTH = 'BTBZMqHH6r4Tts7J_aSIgg'
+const ENDPOINT = 'https://web.push.apple.com/QGuQyavXutnMH5-iphone-do-irmao'
+const registrarWeb = (uid, endpoint = ENDPOINT, p256dh = P256DH, auth = AUTH) =>
+  comoAdmin(dbw, uid, () =>
+    umaW('select public.registrar_dispositivo_web($1,$2,$3,$4) as r', [endpoint, p256dh, auth, 'iPhone'])
+  ).then((l) => l.r)
+
+await teste('o administrador registra o iPhone para receber os avisos', async () => {
+  const r = await registrarWeb(ID_IRMAO_W)
+  verdadeiro(r.ok, r.mensagem)
+  const d = await umaW('select plataforma, web_p256dh, web_auth, user_id from public.dispositivos_push where token = $1', [ENDPOINT])
+  igual([d.plataforma, d.web_p256dh, d.web_auth, d.user_id], ['web', P256DH, AUTH, ID_IRMAO_W])
+  // Registrar de novo (abriu o painel outra vez) não duplica.
+  verdadeiro((await registrarWeb(ID_IRMAO_W)).ok)
+  igual((await umaW('select count(*)::int as n from public.dispositivos_push')).n, 1)
+})
+
+await teste('quem não é administrador não registra aparelho; dado ruim é recusado', async () => {
+  igual((await registrarWeb(ID_COMUM_W, 'https://web.push.apple.com/outro')).erro, 'NAO_AUTORIZADO')
+  igual((await registrarWeb(ID_DONO_W, 'http://inseguro.test/x')).erro, 'DADOS_INCOMPLETOS')
+  igual((await registrarWeb(ID_DONO_W, 'https://web.push.apple.com/y', 'curta')).erro, 'DADOS_INCOMPLETOS')
+  await lancaErro(
+    () => comoAnonimo(dbw, () => umaW('select public.registrar_dispositivo_web($1,$2,$3)', [ENDPOINT, P256DH, AUTH])),
+    'permission denied'
+  )
+})
+
+await teste('Android e iPhone saem em listas separadas para a Edge Function', async () => {
+  await comoAdmin(dbw, ID_DONO_W, () =>
+    umaW('select public.registrar_dispositivo($1,$2) as r', ['token-fcm-do-dono-1234567', 'Pixel'])
+  )
+  const android = await comoServico(dbw, () => todasW('select * from public.destinos_push()'))
+  igual(android.map((d) => d.token), ['token-fcm-do-dono-1234567'], 'iPhone foi parar no Firebase')
+  const web = await comoServico(dbw, () => todasW('select * from public.destinos_web_push()'))
+  igual(web.map((d) => [d.endpoint, d.p256dh, d.auth]), [[ENDPOINT, P256DH, AUTH]])
+  await lancaErro(
+    () => comoAdmin(dbw, ID_DONO_W, () => todasW('select * from public.destinos_web_push()')),
+    'permission denied'
+  )
+})
+
+await teste('administrador desativado deixa de receber no iPhone', async () => {
+  await dbw.query('update public.administradores set ativo = false where user_id = $1', [ID_IRMAO_W])
+  igual((await comoServico(dbw, () => todasW('select * from public.destinos_web_push()'))).length, 0)
+  await dbw.query('update public.administradores set ativo = true where user_id = $1', [ID_IRMAO_W])
+})
+
+await dbw.close()
+
+// =====================================================================
+grupo('Próximos horários, cancelamento pelo cliente e lembretes de 30 min')
+// =====================================================================
+const dbl = await criarBanco()
+const umaL = async (sql, params = []) => (await dbl.query(sql, params)).rows[0]
+const todasL = async (sql, params = []) => (await dbl.query(sql, params)).rows
+const rpcL = async (funcao, args) => {
+  const marcas = args.map((_, i) => `$${i + 1}`).join(', ')
+  return (await comoAnonimo(dbl, () => umaL(`select public.${funcao}(${marcas}) as r`, args))).r
+}
+const ID_DONO_L = randomUUID()
+const ID_COMUM_L = randomUUID()
+await dbl.query("insert into auth.users (id, email) values ($1, 'dono@l.test'), ($2, 'comum@l.test')", [ID_DONO_L, ID_COMUM_L])
+await dbl.query("insert into public.administradores (user_id, nome) values ($1, 'Dono')", [ID_DONO_L])
+const CORTE_L = await umaL("select * from public.servicos where nome = 'Corte de cabelo'")
+const DIA_L = iso((await umaL(
+  `select g::date as d from generate_series((now() at time zone 'America/Sao_Paulo')::date + 1,
+     (now() at time zone 'America/Sao_Paulo')::date + 30, interval '1 day') g
+    where extract(dow from g) between 1 and 4 order by g limit 1`
+)).d)
+const TOKEN_L = (await rpcL('criar_conta', ['Ana Lima', '17955551234', 'segredo1', null])).sessao.token
+const TOKEN_OUTRO_L = (await rpcL('criar_conta', ['Beto Reis', '17955554321', 'segredo1', null])).sessao.token
+const P256DH_L = 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4'
+const AUTH_L = 'BTBZMqHH6r4Tts7J_aSIgg'
+
+/** Agendamento da conta começando daqui a X minutos (direto no banco, sem a antecedência mínima). */
+async function agendamentoDaqui(minutos, telefone = '17955551234', nome = 'Ana Lima', cancelado = false) {
+  return (await umaL(
+    `with c as (
+       insert into public.clientes (nome, telefone) values ($3, $2)
+       on conflict (telefone) do update set nome = excluded.nome returning id
+     ), k as (select id from public.contas where telefone = $2),
+     t as (select date_trunc('minute', now() + make_interval(mins => $1::int)) as ini)
+     insert into public.agendamentos
+       (cliente_id, cliente_nome, conta_id, servico_id, data, horario_inicio, horario_fim, inicio_em, fim_em,
+        servico_nome, servico_preco, servico_duracao, origem, cancelado_em)
+     select c.id, $3, k.id, s.id, (t.ini at time zone 'America/Sao_Paulo')::date,
+            (t.ini at time zone 'America/Sao_Paulo')::time,
+            ((t.ini + interval '35 minutes') at time zone 'America/Sao_Paulo')::time,
+            t.ini, t.ini + interval '35 minutes', s.nome, s.preco, s.duracao_minutos, 'site',
+            case when $4::boolean then now() end
+       from c, k, t, public.servicos s where s.nome = 'Corte de cabelo'
+     returning id`,
+    [minutos, telefone, nome, cancelado]
+  )).id
+}
+
+await teste('dono vê hoje e os próximos dias, com o telefone do cliente', async () => {
+  const r1 = await rpcL('criar_agendamento_conta', [TOKEN_L, CORTE_L.id, DIA_L, '10:00', null])
+  const r2 = await rpcL('criar_agendamento', [CORTE_L.id, DIA_L, '09:00', 'Carlos Avulso', '17955550000', null])
+  verdadeiro(r1.ok && r2.ok, `${r1.mensagem} ${r2.mensagem}`)
+
+  const lista = (await comoAdmin(dbl, ID_DONO_L, () => umaL('select public.proximos_agendamentos(7) as r'))).r
+  verdadeiro(lista.ok, lista.mensagem)
+  igual(
+    lista.agendamentos.map((a) => [a.horario_inicio, a.cliente_nome, a.cliente_telefone]),
+    [['09:00', 'Carlos Avulso', '17955550000'], ['10:00', 'Ana Lima', '17955551234']]
+  )
+  igual((await comoUsuarioComum(dbl, ID_COMUM_L, () => umaL('select public.proximos_agendamentos(7) as r'))).r.erro, 'NAO_AUTORIZADO')
+  await lancaErro(() => comoAnonimo(dbl, () => umaL('select public.proximos_agendamentos(7)')), 'permission denied')
+})
+
+await teste('cliente cancela o próprio horário com antecedência e o dono é avisado', async () => {
+  const ag = (await umaL("select id from public.agendamentos where cliente_nome = 'Ana Lima' and horario_inicio = '10:00'")).id
+  igual((await rpcL('cancelar_meu_agendamento', [TOKEN_OUTRO_L, ag])).erro, 'AGENDAMENTO_NAO_ENCONTRADO', 'cancelou o dos outros')
+  const r = await rpcL('cancelar_meu_agendamento', [TOKEN_L, ag])
+  verdadeiro(r.ok, r.mensagem)
+  igual(r.agendamento.cancelado, true)
+  const aviso = await umaL("select tipo, titulo from public.notificacoes where agendamento_id = $1 and tipo = 'cancelamento_cliente'", [ag])
+  igual(aviso?.titulo, 'Horário cancelado pelo cliente')
+  igual((await umaL('select count(*)::int as n from public.agenda_publica where id = $1', [ag])).n, 0, 'horário não liberou')
+  igual((await rpcL('cancelar_meu_agendamento', [TOKEN_L, ag])).erro, 'AGENDAMENTO_JA_CANCELADO')
+  // Some dos próximos do dono.
+  const lista = (await comoAdmin(dbl, ID_DONO_L, () => umaL('select public.proximos_agendamentos(7) as r'))).r
+  falso(lista.agendamentos.some((a) => a.id === ag), 'cancelado continua nos próximos')
+})
+
+await teste('faltando menos de 40 minutos, o cliente não cancela (fala com a barbearia)', async () => {
+  const perto = await agendamentoDaqui(39)
+  const r = await rpcL('cancelar_meu_agendamento', [TOKEN_L, perto])
+  igual(r.erro, 'CANCELAMENTO_CLIENTE_TARDE')
+  verdadeiro(/40 minutos/.test(r.mensagem), r.mensagem)
+  igual((await umaL('select cancelado_em from public.agendamentos where id = $1', [perto])).cancelado_em, null)
+  igual((await rpcL('cancelar_meu_agendamento', ['x', perto])).erro, 'SESSAO_EXPIRADA')
+})
+
+await teste('cliente liga os avisos neste aparelho (só com sessão válida)', async () => {
+  const ok = await rpcL('registrar_aparelho_conta', [TOKEN_L, 'https://web.push.apple.com/aparelho-da-ana', P256DH_L, AUTH_L])
+  verdadeiro(ok.ok, ok.mensagem)
+  igual((await rpcL('registrar_aparelho_conta', ['x', 'https://web.push.apple.com/z', P256DH_L, AUTH_L])).erro, 'SESSAO_EXPIRADA')
+  igual((await rpcL('registrar_aparelho_conta', [TOKEN_L, 'https://web.push.apple.com/z', 'curta', AUTH_L])).erro, 'DADOS_INCOMPLETOS')
+  await lancaErro(() => comoAnonimo(dbl, () => todasL('select * from public.aparelhos_conta')), 'permission denied')
+  const conta = await umaL("select id from public.contas where telefone = '17955551234'")
+  const destinos = await comoServico(dbl, () => todasL('select * from public.destinos_web_conta($1)', [conta.id]))
+  igual(destinos.map((d) => d.endpoint), ['https://web.push.apple.com/aparelho-da-ana'])
+})
+
+await teste('lembrete 30 min antes: dono e cliente, uma vez só', async () => {
+  await dbl.query('delete from public.notificacoes')
+  // O de 39 min (teste anterior) ocupa [39, 74): este fica em [2, 37).
+  const daqui20 = await agendamentoDaqui(2, '17955551234', 'Ana Lima')
+  await agendamentoDaqui(150) // longe: ainda não
+
+  const enviados = (await comoServico(dbl, () => umaL('select public.enviar_lembretes() as n'))).n
+  igual(enviados, 2, 'lembretes criados (dono + cliente; o de 39 min ainda não)')
+  const notifs = await todasL(
+    "select tipo, titulo, dados->>'destino' as destino from public.notificacoes where agendamento_id = $1 order by tipo",
+    [daqui20]
+  )
+  igual(notifs.map((n) => [n.tipo, n.destino]), [['lembrete', null], ['lembrete_cliente', 'cliente']])
+
+  // Rodar de novo (o pg_cron roda a cada minuto) não repete nada.
+  igual((await comoServico(dbl, () => umaL('select public.enviar_lembretes() as n'))).n, 0)
+  await lancaErro(() => comoAnonimo(dbl, () => umaL('select public.enviar_lembretes()')), 'permission denied')
+})
+
+await teste('horário cancelado não recebe lembrete', async () => {
+  const conta = await umaL("select id from public.contas where telefone = '17955554321'")
+  // Já cancelado (não ocupa o horário, então pode cair em cima dos outros).
+  const id = await agendamentoDaqui(10, '17955554321', 'Beto Reis', true)
+  await comoServico(dbl, () => umaL('select public.enviar_lembretes() as n'))
+  igual((await umaL('select count(*)::int as n from public.notificacoes where agendamento_id = $1', [id])).n, 0)
+  verdadeiro(conta.id, 'conta do Beto')
+})
+
+await dbl.close()
+
+// =====================================================================
 const falhas = relatorio()
 await db.close()
 process.exit(falhas > 0 ? 1 : 0)
