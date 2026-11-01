@@ -32,7 +32,10 @@ export default function App() {
     // "?instalar=1" vem do botão "Abrir no Chrome" da aba App.
     new URLSearchParams(window.location.search).has('instalar') && total === ABAS.length
       ? indiceDaAba('app')
-      : abaDoEndereco(window.location.hash, total),
+      : // Abrindo o site (sem #aba no endereço), o cliente já cai na escolha do serviço.
+        window.location.hash.replace('#', '') === ''
+        ? indiceDaAba('servicos')
+        : abaDoEndereco(window.location.hash, total),
   )
   const paineis = useRef<(HTMLElement | null)[]>([])
   const toque = useRef<{ x: number; y: number } | null>(null)
@@ -158,6 +161,11 @@ export default function App() {
           </section>
 
           <section {...painel('servicos')}>
+            {conta && (
+              <div className="container" style={{ paddingTop: 16 }}>
+                <AvisoProximoHorario fuso={config?.fuso} aoAbrir={abrirConta} />
+              </div>
+            )}
             <SecaoServicos
               servicos={servicos}
               carregando={carregando}
