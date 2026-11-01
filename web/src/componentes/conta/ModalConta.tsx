@@ -12,8 +12,11 @@ export type TelaConta = 'entrar' | 'criar'
 interface Props {
   telaInicial: TelaConta
   config: ConfigBarbearia | null
-  /** Aberto do meio do agendamento: depois de entrar, fecha e volta para ele. */
-  voltarAoAgendamento: boolean
+  /**
+   * Porta de entrada do site: aparece na primeira vez que a pessoa abre e
+   * não fecha até ela entrar ou criar a conta.
+   */
+  obrigatorio?: boolean
   aoFechar: () => void
   aoAgendar: () => void
 }
@@ -21,7 +24,7 @@ interface Props {
 export function ModalConta({
   telaInicial,
   config,
-  voltarAoAgendamento,
+  obrigatorio = false,
   aoFechar,
   aoAgendar,
 }: Props) {
@@ -32,6 +35,7 @@ export function ModalConta({
     return salvo ? mascararTelefone(salvo.telefone) : ''
   })
   const [enviando, setEnviando] = useState(false)
+  const podeFechar = !obrigatorio && !enviando
 
   useEffect(() => {
     const anterior = document.body.style.overflow
@@ -43,11 +47,11 @@ export function ModalConta({
 
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !enviando) aoFechar()
+      if (e.key === 'Escape' && podeFechar) aoFechar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [aoFechar, enviando])
+  }, [aoFechar, podeFechar])
 
   // Já logado: os horários podem ter mudado no app do dono desde a última vez.
   const logadoAoAbrir = useRef(Boolean(conta))
@@ -55,21 +59,25 @@ export function ModalConta({
     if (logadoAoAbrir.current) void atualizar()
   }, [atualizar])
 
-  const aoConcluir = () => {
-    if (voltarAoAgendamento) aoFechar()
-    // Senão, a própria conta aparece (o modal vira "Minha conta").
-  }
+  // Entrou: na porta de entrada o site aparece sozinho; senão vira "Minha conta".
+  const aoConcluir = () => {}
 
-  const titulo = conta ? 'Minha conta' : tela === 'entrar' ? 'Entrar na conta' : 'Criar conta'
+  const titulo = conta
+    ? 'Minha conta'
+    : obrigatorio
+      ? 'Bem-vindo à Arte 10'
+      : tela === 'entrar'
+        ? 'Entrar na conta'
+        : 'Criar conta'
 
   return (
     <div
-      className="modal"
+      className={`modal ${obrigatorio ? 'modal--obrigatorio' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={titulo}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !enviando) aoFechar()
+        if (e.target === e.currentTarget && podeFechar) aoFechar()
       }}
     >
       <div className="modal__caixa modal__caixa--conta">
@@ -82,15 +90,17 @@ export function ModalConta({
             style={{ borderRadius: 9, objectFit: 'cover' }}
           />
           <h2 className="modal__titulo">{titulo}</h2>
-          <button
-            type="button"
-            className="modal__fechar"
-            onClick={aoFechar}
-            disabled={enviando}
-            aria-label="Fechar"
-          >
-            <IconeFechar tamanho={19} />
-          </button>
+          {!obrigatorio && (
+            <button
+              type="button"
+              className="modal__fechar"
+              onClick={aoFechar}
+              disabled={enviando}
+              aria-label="Fechar"
+            >
+              <IconeFechar tamanho={19} />
+            </button>
+          )}
         </div>
 
         {conta ? (
@@ -98,8 +108,14 @@ export function ModalConta({
         ) : (
           <>
             <div className="conta__abas">
+              {obrigatorio && (
+                <p className="conta__boas-vindas">
+                  Entre ou crie sua conta para agendar e ver seus horários. É só desta vez:
+                  depois você já entra direto.
+                </p>
+              )}
               <div className="alternador" role="tablist" aria-label="Entrar ou criar conta">
-                {(['entrar', 'criar'] as const).map((t) => (
+                {(['criar', 'entrar'] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -109,7 +125,7 @@ export function ModalConta({
                     className={`alternador__item ${tela === t ? 'alternador__item--ativo' : ''}`}
                     onClick={() => setTela(t)}
                   >
-                    {t === 'entrar' ? 'Entrar' : 'Criar conta'}
+                    {t === 'entrar' ? 'Já tenho conta' : 'Criar conta'}
                   </button>
                 ))}
               </div>

@@ -198,10 +198,6 @@ export function FormCriarConta({
   return (
     <>
       <div className="modal__corpo">
-        <p className="conta__intro">
-          Com a conta você agenda sem digitar nada e vê os horários que marcou.
-        </p>
-
         <form id="form-criar" onSubmit={(e) => void enviar(e)} noValidate>
           <div className="campo">
             <label className="campo__rotulo" htmlFor="criar-nome">

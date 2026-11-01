@@ -74,6 +74,19 @@
   color: var(--ouro-200);
 }
 
+/* Porta de entrada (conta obrigatória) ------------------------------ */
+
+.modal--obrigatorio {
+  background: rgba(2, 5, 13, 0.9);
+}
+
+.conta__boas-vindas {
+  margin-bottom: 14px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--texto-suave);
+}
+
 /* Formulários ------------------------------------------------------- */
 
 .conta__abas {
@@ -83,12 +96,6 @@
 
 .conta__abas .alternador {
   max-width: none;
-}
-
-.conta__intro {
-  margin-bottom: 18px;
-  font-size: 0.92rem;
-  color: var(--texto-suave);
 }
 
 .campo__opcional {
@@ -135,17 +142,7 @@
   margin-bottom: 14px;
 }
 
-/* Convite para entrar, no agendamento ------------------------------- */
-
-.convite-conta {
-  margin-top: 18px;
-  padding: 12px 14px;
-  border-radius: var(--raio-sm);
-  border: 1px dashed var(--borda);
-  font-size: 0.86rem;
-  line-height: 1.55;
-  color: var(--texto-suave);
-}
+/* "Agendando pela sua conta" ----------------------------------------- */
 
 .cliente-salvo__icone--conta {
   background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));

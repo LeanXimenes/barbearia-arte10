@@ -1,59 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { Assinatura, Conta, Servico } from '../../lib/tipos'
-import type { ClienteSalvo } from '../../lib/clienteSalvo'
-import type { TelaConta } from '../conta/ModalConta'
 import { consultarMeuPlano } from '../../servicos/api'
-import {
-  dataCurta,
-  duracao,
-  mascararTelefone,
-  moeda,
-  nomeValido,
-  telefoneBonito,
-  telefoneValido,
-} from '../../lib/formato'
-import { IconeUsuario } from '../Icones'
+import { dataCurta, duracao, moeda, telefoneBonito, telefoneValido } from '../../lib/formato'
 
 interface Props {
   servico: Servico
   data: string
   horario: string
   horarioFim: string
-  nome: string
-  telefone: string
-  tentouEnviar: boolean
-  /** Logado: agenda com o nome e o número da conta, sem formulário. */
-  conta: Conta | null
-  aoAbrirConta: (tela: TelaConta) => void
-  /** Cliente lembrado neste celular (do último agendamento). */
-  salvo: ClienteSalvo | null
-  usandoSalvo: boolean
-  aoUsarOutro: () => void
-  aoUsarSalvo: () => void
-  aoMudarNome: (valor: string) => void
-  aoMudarTelefone: (valor: string) => void
+  /** O agendamento sai no nome e no número da conta: nada para digitar. */
+  conta: Conta
 }
 
-export function FormularioDados({
-  servico,
-  data,
-  horario,
-  horarioFim,
-  nome,
-  telefone,
-  tentouEnviar,
-  conta,
-  aoAbrirConta,
-  salvo,
-  usandoSalvo,
-  aoUsarOutro,
-  aoUsarSalvo,
-  aoMudarNome,
-  aoMudarTelefone,
-}: Props) {
-  const nomeRuim = tentouEnviar && !nomeValido(nome)
-  const telefoneRuim = tentouEnviar && !telefoneValido(telefone)
-  const plano = usePlanoDoTelefone(servico.usa_plano ? (conta?.telefone ?? telefone) : '')
+/** Último passo do agendamento: revisão e "Agendando pela sua conta". */
+export function FormularioDados({ servico, data, horario, horarioFim, conta }: Props) {
+  const plano = usePlanoDoTelefone(servico.usa_plano ? conta.telefone : '')
 
   return (
     <div>
@@ -91,104 +52,16 @@ export function FormularioDados({
         </div>
       )}
 
-      {conta ? (
-        <div className="cliente-salvo">
-          <span className="cliente-salvo__icone cliente-salvo__icone--conta" aria-hidden>
-            {conta.nome.trim().charAt(0).toUpperCase()}
-          </span>
-          <span className="cliente-salvo__dados">
-            <span className="cliente-salvo__rotulo">Agendando pela sua conta</span>
-            <span className="cliente-salvo__nome">{conta.nome}</span>
-            <span className="cliente-salvo__tel">{telefoneBonito(conta.telefone)}</span>
-          </span>
-        </div>
-      ) : usandoSalvo && salvo ? (
-        <div className="cliente-salvo">
-          <span className="cliente-salvo__icone">
-            <IconeUsuario tamanho={18} />
-          </span>
-          <span className="cliente-salvo__dados">
-            <span className="cliente-salvo__rotulo">Agendando como</span>
-            <span className="cliente-salvo__nome">{salvo.nome}</span>
-            <span className="cliente-salvo__tel">{telefoneBonito(salvo.telefone)}</span>
-          </span>
-          <button
-            type="button"
-            className="botao botao--fantasma cliente-salvo__trocar"
-            onClick={aoUsarOutro}
-          >
-            Usar outro nome e número
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="campo">
-            <label className="campo__rotulo" htmlFor="campo-nome">
-              Seu nome
-            </label>
-            <input
-              id="campo-nome"
-              className={`campo__entrada ${nomeRuim ? 'campo__entrada--erro' : ''}`}
-              type="text"
-              autoComplete="name"
-              maxLength={80}
-              placeholder="Como podemos te chamar?"
-              value={nome}
-              onChange={(e) => aoMudarNome(e.target.value)}
-              aria-invalid={nomeRuim}
-            />
-            {nomeRuim && <span className="campo__erro">Informe seu nome (mínimo 2 letras).</span>}
-          </div>
-
-          <div className="campo">
-            <label className="campo__rotulo" htmlFor="campo-telefone">
-              WhatsApp / telefone
-            </label>
-            <input
-              id="campo-telefone"
-              className={`campo__entrada ${telefoneRuim ? 'campo__entrada--erro' : ''}`}
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              placeholder="(00) 00000-0000"
-              value={telefone}
-              onChange={(e) => aoMudarTelefone(mascararTelefone(e.target.value))}
-              aria-invalid={telefoneRuim}
-            />
-            {telefoneRuim ? (
-              <span className="campo__erro">
-                Informe um número válido com DDD, como (17) 99999-0000.
-              </span>
-            ) : (
-              <span className="campo__dica">Usamos só para identificar o seu agendamento.</span>
-            )}
-          </div>
-
-          {salvo && (
-            <button
-              type="button"
-              className="botao botao--fantasma cliente-salvo__voltar"
-              onClick={aoUsarSalvo}
-            >
-              Voltar para {salvo.nome.split(' ')[0]}
-            </button>
-          )}
-        </>
-      )}
-
-      {!conta && (
-        <p className="convite-conta">
-          Tem conta?{' '}
-          <button type="button" className="link-ouro" onClick={() => aoAbrirConta('entrar')}>
-            Entrar
-          </button>{' '}
-          ou{' '}
-          <button type="button" className="link-ouro" onClick={() => aoAbrirConta('criar')}>
-            criar conta
-          </button>{' '}
-          para não digitar nada e ver seus horários depois.
-        </p>
-      )}
+      <div className="cliente-salvo">
+        <span className="cliente-salvo__icone cliente-salvo__icone--conta" aria-hidden>
+          {conta.nome.trim().charAt(0).toUpperCase()}
+        </span>
+        <span className="cliente-salvo__dados">
+          <span className="cliente-salvo__rotulo">Agendando pela sua conta</span>
+          <span className="cliente-salvo__nome">{conta.nome}</span>
+          <span className="cliente-salvo__tel">{telefoneBonito(conta.telefone)}</span>
+        </span>
+      </div>
     </div>
   )
 }

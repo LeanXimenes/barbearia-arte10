@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import type { DiaDisponivel } from '../../lib/tipos'
 import { nomeDoMes } from '../../lib/formato'
+import { diaTemVaga } from '../../lib/diaEscolhido'
 import { IconeAlerta, IconeAvancar, IconeVoltar } from '../Icones'
 
 interface Props {
   dias: DiaDisponivel[]
+  hoje: string
   mesVisivel: string // "2026-09"
   selecionada: string | null
   carregando: boolean
@@ -20,6 +22,7 @@ const NOMES_DIAS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 export function EscolhaData({
   dias,
+  hoje,
   mesVisivel,
   selecionada,
   carregando,
@@ -52,32 +55,36 @@ export function EscolhaData({
     return lista
   }, [ano, mes, anoTexto, mesTexto])
 
+  const livresNoMes = celulas.filter((d) => d && diaTemVaga(porData.get(d))).length
+  // Primeira carga: ainda não sabemos quais dias têm vaga.
+  const semDados = carregando && dias.length === 0
+
   return (
-    <div>
+    <div className="calendario">
+      <p className="calendario__dica">Os dias em dourado têm horário livre.</p>
+
       <div className="calendario__topo">
-        <span className="calendario__mes">
+        <button
+          type="button"
+          className="calendario__seta"
+          onClick={() => aoTrocarMes(-1)}
+          disabled={!podeVoltarMes}
+          aria-label="Mês anterior"
+        >
+          <IconeVoltar tamanho={18} />
+        </button>
+        <span className="calendario__mes" aria-live="polite">
           {nomeDoMes(mes).replace(/^./, (c) => c.toUpperCase())} de {ano}
         </span>
-        <span className="calendario__nav">
-          <button
-            type="button"
-            className="calendario__seta"
-            onClick={() => aoTrocarMes(-1)}
-            disabled={!podeVoltarMes}
-            aria-label="Mês anterior"
-          >
-            <IconeVoltar tamanho={16} />
-          </button>
-          <button
-            type="button"
-            className="calendario__seta"
-            onClick={() => aoTrocarMes(1)}
-            disabled={!podeAvancarMes}
-            aria-label="Próximo mês"
-          >
-            <IconeAvancar tamanho={16} />
-          </button>
-        </span>
+        <button
+          type="button"
+          className="calendario__seta"
+          onClick={() => aoTrocarMes(1)}
+          disabled={!podeAvancarMes}
+          aria-label="Próximo mês"
+        >
+          <IconeAvancar tamanho={18} />
+        </button>
       </div>
 
       {erro && (
@@ -100,13 +107,15 @@ export function EscolhaData({
         ))}
       </div>
 
-      <div className="calendario__grade" role="grid">
+      <div className={`calendario__grade ${semDados ? 'calendario__grade--carregando' : ''}`} role="grid">
         {celulas.map((data, indice) => {
           if (!data) return <span key={`vazio-${indice}`} className="dia dia--vazio" />
 
           const info = porData.get(data)
-          const disponivel = Boolean(info?.aberto && info.dentro_da_janela && info.disponiveis > 0)
+          const livre = diaTemVaga(info)
+          const passado = data < hoje
           const numero = Number(data.slice(8, 10))
+          const ehHoje = data === hoje
 
           return (
             <button
@@ -115,25 +124,35 @@ export function EscolhaData({
               role="gridcell"
               className={[
                 'dia',
-                !disponivel ? 'dia--indisponivel' : '',
+                livre ? 'dia--livre' : 'dia--indisponivel',
+                passado ? 'dia--passado' : '',
+                ehHoje ? 'dia--hoje' : '',
                 selecionada === data ? 'dia--selecionado' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
-              disabled={!disponivel || carregando}
+              disabled={!livre}
               onClick={() => aoSelecionar(data)}
+              aria-current={ehHoje ? 'date' : undefined}
               aria-label={
-                disponivel
-                  ? `Dia ${numero}, ${info?.disponiveis} horário(s) livre(s)`
-                  : `Dia ${numero} indisponível`
+                livre
+                  ? `${ehHoje ? 'Hoje, ' : ''}dia ${numero}, ${info?.disponiveis} horário(s) livre(s)`
+                  : `Dia ${numero}, sem horário`
               }
             >
-              {numero}
-              {disponivel && <span className="dia__ponto" />}
+              <span className="dia__numero">{numero}</span>
+              {ehHoje && <span className="dia__hoje">hoje</span>}
             </button>
           )
         })}
       </div>
+
+      {!semDados && !erro && livresNoMes === 0 && (
+        <p className="calendario__vazio">
+          Nenhum dia com horário livre neste mês.
+          {podeAvancarMes && ' Veja o próximo mês.'}
+        </p>
+      )}
 
       <div className="legenda">
         <span className="legenda__item">
@@ -141,16 +160,14 @@ export function EscolhaData({
           Com horário livre
         </span>
         <span className="legenda__item">
+          <span className="legenda__amostra legenda__amostra--hoje" />
+          Hoje
+        </span>
+        <span className="legenda__item">
           <span className="legenda__amostra" />
           Fechado ou lotado
         </span>
       </div>
-
-      {carregando && (
-        <p className="campo__dica" style={{ marginTop: 12 }}>
-          Atualizando disponibilidade…
-        </p>
-      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ cd C:\arte10\supabase\tests
 npm install
 npm test
 
-# Site (56)
+# Site (58)
 cd C:\arte10\web
 npm test
 

@@ -11,10 +11,9 @@ import {
   assinarAgenda,
   carregarDias,
   carregarHorarios,
-  criarAgendamento,
   criarAgendamentoConta,
 } from '../../servicos/api'
-import { dataCurta, hora, mascararTelefone, nomeValido, telefoneValido } from '../../lib/formato'
+import { dataCurta, hora } from '../../lib/formato'
 import { agoraNaBarbearia, somarDias } from '../../lib/relogio'
 import {
   MSG_SEM_CONEXAO,
@@ -26,21 +25,24 @@ import { EscolhaServico } from './EscolhaServico'
 import { EscolhaData } from './EscolhaData'
 import { EscolhaHorario } from './EscolhaHorario'
 import { FormularioDados } from './FormularioDados'
-import { lerCliente, salvarCliente, type ClienteSalvo } from '../../lib/clienteSalvo'
 import { Confirmacao } from './Confirmacao'
 import { useConta } from '../../hooks/useConta'
-import type { TelaConta } from '../conta/ModalConta'
+import { proximoDiaLivre } from '../../lib/diaEscolhido'
 import { IconeAlerta, IconeFechar, IconeVoltar } from '../Icones'
 
-type Passo = 'servico' | 'data' | 'horario' | 'dados' | 'confirmado'
+// O dia não é mais um passo: os horários já abrem no dia de hoje e o
+// calendário só aparece quando a pessoa toca em "Escolher outro dia".
+type Passo = 'servico' | 'horario' | 'dados' | 'confirmado'
 
-const ORDEM_PASSOS: Passo[] = ['servico', 'data', 'horario', 'dados']
+const ORDEM_PASSOS: Passo[] = ['servico', 'horario', 'dados']
+
+/** O banco calcula no máximo 92 dias por pedido. */
+const DIAS_POR_PEDIDO = 90
 
 const TITULOS: Record<Passo, string> = {
   servico: 'Escolha o serviço',
-  data: 'Escolha o dia',
   horario: 'Escolha o horário',
-  dados: 'Seus dados',
+  dados: 'Confirme o horário',
   confirmado: 'Tudo certo',
 }
 
@@ -49,10 +51,7 @@ interface Props {
   config: ConfigBarbearia | null
   servicoInicialId?: string | null
   online: boolean
-  /** A janela da conta está por cima: Esc e clique fora são dela. */
-  pausado?: boolean
   aoFechar: () => void
-  aoAbrirConta: (tela: TelaConta) => void
   aoVerMeusHorarios: () => void
 }
 
@@ -66,26 +65,24 @@ export function ModalAgendamento({
   config,
   servicoInicialId,
   online,
-  pausado = false,
   aoFechar,
-  aoAbrirConta,
   aoVerMeusHorarios,
 }: Props) {
-  // Logado, o nome e o número vêm da conta: nada para digitar.
+  // Só abre logado: o nome e o número vêm da conta, nada para digitar.
   const { conta, token, atualizar: atualizarConta, sessaoExpirou } = useConta()
-  const logado = Boolean(conta && token)
 
   const fuso = config?.fuso
   const hoje = useMemo(() => agoraNaBarbearia(fuso).data, [fuso])
   const janelaDias = config?.antecedencia_maxima_dias ?? 60
   const ultimaData = useMemo(() => somarDias(hoje, janelaDias), [hoje, janelaDias])
 
-  const [passo, setPasso] = useState<Passo>(servicoInicialId ? 'data' : 'servico')
+  const [passo, setPasso] = useState<Passo>(servicoInicialId ? 'horario' : 'servico')
   const [servico, setServico] = useState<Servico | null>(
     () => servicos.find((s) => s.id === servicoInicialId) ?? null,
   )
-  const [data, setData] = useState<string | null>(null)
+  const [data, setData] = useState<string | null>(() => (servicoInicialId ? hoje : null))
   const [horario, setHorario] = useState<string | null>(null)
+  const [calendarioAberto, setCalendarioAberto] = useState(false)
 
   const [mesVisivel, setMesVisivel] = useState(() => hoje.slice(0, 7))
   const [dias, setDias] = useState<DiaDisponivel[]>([])
@@ -96,13 +93,6 @@ export function ModalAgendamento({
   const [carregandoHorarios, setCarregandoHorarios] = useState(false)
   const [erroHorarios, setErroHorarios] = useState(false)
   const [avisoAtualizacao, setAvisoAtualizacao] = useState(false)
-
-  // Quem já agendou neste celular não precisa digitar de novo.
-  const [salvo, setSalvo] = useState<ClienteSalvo | null>(() => lerCliente())
-  const [usandoSalvo, setUsandoSalvo] = useState(() => salvo !== null)
-  const [nome, setNome] = useState(() => salvo?.nome ?? '')
-  const [telefone, setTelefone] = useState(() => (salvo ? mascararTelefone(salvo.telefone) : ''))
-  const [tentouEnviar, setTentouEnviar] = useState(false)
 
   const [enviando, setEnviando] = useState(false)
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
@@ -135,45 +125,38 @@ export function ModalAgendamento({
 
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !enviando && !pausado) aoFechar()
+      if (e.key === 'Escape' && !enviando) aoFechar()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [aoFechar, enviando, pausado])
+  }, [aoFechar, enviando])
 
   // ------------------------------------------------------------------
   // Carregamento de dados
   // ------------------------------------------------------------------
+  // A janela inteira de uma vez: trocar de mês no calendário fica instantâneo
+  // e dá para achar o próximo dia livre quando hoje está lotado.
   const buscarDias = useCallback(
     async (silencioso = false) => {
       if (!servico) return
 
-      const primeiroDoMes = `${mesVisivel}-01`
-      const ultimoDoMes = (() => {
-        const [a, m] = mesVisivel.split('-').map(Number)
-        const dia = new Date(a ?? 1970, m ?? 1, 0).getDate()
-        return `${mesVisivel}-${String(dia).padStart(2, '0')}`
-      })()
-
-      const inicio = primeiroDoMes < hoje ? hoje : primeiroDoMes
-      const fim = ultimoDoMes > ultimaData ? ultimaData : ultimoDoMes
-
-      if (inicio > fim) {
-        setDias([])
-        return
+      const pedidos: Promise<DiaDisponivel[]>[] = []
+      for (let inicio = hoje; inicio <= ultimaData; inicio = somarDias(inicio, DIAS_POR_PEDIDO)) {
+        const fim = somarDias(inicio, DIAS_POR_PEDIDO - 1)
+        pedidos.push(carregarDias(servico.id, inicio, fim > ultimaData ? ultimaData : fim))
       }
 
       if (!silencioso) setCarregandoDias(true)
       setErroDias(false)
       try {
-        setDias(await carregarDias(servico.id, inicio, fim))
+        setDias((await Promise.all(pedidos)).flat())
       } catch {
         setErroDias(true)
       } finally {
         setCarregandoDias(false)
       }
     },
-    [servico, mesVisivel, hoje, ultimaData],
+    [servico, hoje, ultimaData],
   )
 
   const buscarHorarios = useCallback(
@@ -221,23 +204,31 @@ export function ModalAgendamento({
   function voltar() {
     if (enviando) return
     setErroEnvio(null)
-    if (passo === 'data') setPasso('servico')
-    else if (passo === 'horario') setPasso('data')
+    if (calendarioAberto) setCalendarioAberto(false)
+    else if (passo === 'horario') setPasso('servico')
     else if (passo === 'dados') setPasso('horario')
   }
 
   function escolherServico(s: Servico) {
     setServico(s)
-    setData(null)
+    // Já abre no dia de hoje (ou no dia que a pessoa tinha escolhido).
+    setData((atual) => atual ?? hoje)
     setHorario(null)
     setHorarios([])
-    setPasso('data')
+    setCalendarioAberto(false)
+    setPasso('horario')
   }
 
   function escolherData(d: string) {
     setData(d)
     setHorario(null)
+    setCalendarioAberto(false)
     setPasso('horario')
+  }
+
+  function abrirCalendario() {
+    setMesVisivel((data ?? hoje).slice(0, 7))
+    setCalendarioAberto(true)
   }
 
   function escolherHorario(h: string) {
@@ -253,16 +244,15 @@ export function ModalAgendamento({
   }
 
   const horarioEscolhido = horarios.find((h) => hora(h.horario) === horario)
+  const infoDoDia = dias.find((d) => String(d.data).slice(0, 10) === data) ?? null
+  const proximoLivre = data ? proximoDiaLivre(dias, data) : null
 
   // ------------------------------------------------------------------
   // Confirmação — o único ponto que grava no banco.
   // ------------------------------------------------------------------
   async function confirmar() {
     if (enviando) return // trava contra cliques repetidos (item 21)
-    setTentouEnviar(true)
-
-    if (!servico || !data || !horario) return
-    if (!logado && (!nomeValido(nome) || !telefoneValido(telefone))) return
+    if (!servico || !data || !horario || !token) return
 
     if (!online) {
       setErroEnvio(MSG_SEM_CONEXAO)
@@ -273,37 +263,25 @@ export function ModalAgendamento({
     setErroEnvio(null)
 
     try {
-      const pedido = { servicoId: servico.id, data, horario, chave: chaveRef.current }
-      const resposta =
-        logado && token
-          ? await criarAgendamentoConta(token, pedido)
-          : await criarAgendamento({ ...pedido, nome, telefone })
+      const resposta = await criarAgendamentoConta(token, {
+        servicoId: servico.id,
+        data,
+        horario,
+        chave: chaveRef.current,
+      })
 
       if (resposta.ok) {
-        const lembrado = {
-          nome: resposta.agendamento.cliente,
-          telefone: resposta.agendamento.telefone,
-        }
-        salvarCliente(lembrado)
-        setSalvo(lembrado)
-        setUsandoSalvo(true)
-        if (logado) void atualizarConta()
+        void atualizarConta()
         setResultado({ agendamento: resposta.agendamento, barbearia: resposta.barbearia })
         setPasso('confirmado')
         void buscarHorarios(true)
         return
       }
 
-      // A sessão acabou (saiu em outro aparelho, venceu): vira visitante e
-      // os dados lembrados preenchem o formulário. Nada foi gravado.
+      // A sessão não vale mais (ex.: a conta foi apagada): nada foi gravado.
+      // O site volta para a porta de entrada.
       if (resposta.erro === 'SESSAO_EXPIRADA') {
         sessaoExpirou()
-        const lembrado = lerCliente()
-        setSalvo(lembrado)
-        setUsandoSalvo(lembrado !== null)
-        setNome(lembrado?.nome ?? '')
-        setTelefone(lembrado ? mascararTelefone(lembrado.telefone) : '')
-        setErroEnvio(`${resposta.mensagem} Ou confirme com os dados abaixo.`)
         return
       }
 
@@ -332,10 +310,6 @@ export function ModalAgendamento({
     setServico(null)
     setData(null)
     setHorario(null)
-    setNome(salvo?.nome ?? '')
-    setTelefone(salvo ? mascararTelefone(salvo.telefone) : '')
-    setUsandoSalvo(salvo !== null)
-    setTentouEnviar(false)
     setErroEnvio(null)
   }
 
@@ -343,9 +317,7 @@ export function ModalAgendamento({
   const mesAtual = hoje.slice(0, 7)
   const mesLimite = ultimaData.slice(0, 7)
 
-  const podeConfirmar =
-    Boolean(servico && data && horario) &&
-    (logado || (nomeValido(nome) && telefoneValido(telefone)))
+  const podeConfirmar = Boolean(servico && data && horario && token)
 
   return (
     <div
@@ -354,7 +326,7 @@ export function ModalAgendamento({
       aria-modal="true"
       aria-label="Agendar horário"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !enviando && !pausado) aoFechar()
+        if (e.target === e.currentTarget && !enviando) aoFechar()
       }}
     >
       <div className="modal__caixa">
@@ -380,7 +352,7 @@ export function ModalAgendamento({
           )}
 
           <h2 className="modal__titulo">
-            {passo === 'dados' && logado ? 'Confirme o horário' : TITULOS[passo]}
+            {passo === 'horario' && calendarioAberto ? 'Escolha o dia' : TITULOS[passo]}
           </h2>
 
           <button
@@ -411,7 +383,8 @@ export function ModalAgendamento({
           {passo !== 'servico' && passo !== 'confirmado' && (
             <div className="resumo-escolha">
               {servico && <span className="pilula">{servico.nome}</span>}
-              {data && <span className="pilula">{dataCurta(data)}</span>}
+              {/* Na escolha do horário o dia já aparece em destaque logo abaixo. */}
+              {data && passo !== 'horario' && <span className="pilula">{dataCurta(data)}</span>}
               {horario && <span className="pilula">{horario}</span>}
             </div>
           )}
@@ -424,9 +397,10 @@ export function ModalAgendamento({
             />
           )}
 
-          {passo === 'data' && (
+          {passo === 'horario' && calendarioAberto && (
             <EscolhaData
               dias={dias}
+              hoje={hoje}
               mesVisivel={mesVisivel}
               selecionada={data}
               carregando={carregandoDias}
@@ -439,9 +413,12 @@ export function ModalAgendamento({
             />
           )}
 
-          {passo === 'horario' && data && (
+          {passo === 'horario' && !calendarioAberto && data && (
             <EscolhaHorario
               data={data}
+              hoje={hoje}
+              infoDoDia={infoDoDia}
+              proximoLivre={proximoLivre}
               horarios={horarios}
               carregando={carregandoHorarios}
               erro={erroHorarios}
@@ -449,36 +426,18 @@ export function ModalAgendamento({
               selecionado={horario}
               aoSelecionar={escolherHorario}
               aoTentarNovamente={() => void buscarHorarios()}
+              aoEscolherOutroDia={abrirCalendario}
+              aoIrParaDia={escolherData}
             />
           )}
 
-          {passo === 'dados' && servico && data && horario && (
+          {passo === 'dados' && servico && data && horario && conta && (
             <FormularioDados
               servico={servico}
               data={data}
               horario={horario}
               horarioFim={hora(horarioEscolhido?.horario_fim) || ''}
-              nome={nome}
-              telefone={telefone}
-              tentouEnviar={tentouEnviar}
-              conta={logado ? conta : null}
-              aoAbrirConta={aoAbrirConta}
-              salvo={salvo}
-              usandoSalvo={usandoSalvo}
-              aoUsarOutro={() => {
-                setUsandoSalvo(false)
-                setNome('')
-                setTelefone('')
-                setTentouEnviar(false)
-              }}
-              aoUsarSalvo={() => {
-                if (!salvo) return
-                setUsandoSalvo(true)
-                setNome(salvo.nome)
-                setTelefone(mascararTelefone(salvo.telefone))
-              }}
-              aoMudarNome={setNome}
-              aoMudarTelefone={setTelefone}
+              conta={conta}
             />
           )}
 
@@ -525,11 +484,9 @@ export function ModalAgendamento({
             <button type="button" className="botao botao--ouro botao--bloco" onClick={aoFechar}>
               Concluir
             </button>
-            {logado && (
-              <button type="button" className="botao botao--contorno" onClick={aoVerMeusHorarios}>
-                Ver meus horários
-              </button>
-            )}
+            <button type="button" className="botao botao--contorno" onClick={aoVerMeusHorarios}>
+              Ver meus horários
+            </button>
             <button type="button" className="botao botao--fantasma" onClick={recomecar}>
               Agendar outro horário
             </button>

@@ -13,7 +13,7 @@ import { SecaoApp } from './componentes/SecaoApp'
 import { SecaoClube } from './componentes/SecaoClube'
 import { abertoComoApp } from './hooks/useInstalarApp'
 import { ModalAgendamento } from './componentes/agendamento/ModalAgendamento'
-import { ModalConta, type TelaConta } from './componentes/conta/ModalConta'
+import { ModalConta } from './componentes/conta/ModalConta'
 import { IconeAlerta } from './componentes/Icones'
 import { useConta } from './hooks/useConta'
 
@@ -22,11 +22,8 @@ export default function App() {
   const online = useOnline()
   const { conta } = useConta()
 
-  // Entrar / criar conta / "Minha conta". Pode abrir por cima do agendamento.
-  const [modalConta, setModalConta] = useState<{
-    tela: TelaConta
-    voltarAoAgendamento: boolean
-  } | null>(null)
+  // "Minha conta" (pelo botão do topo). Sem conta, aparece a porta de entrada.
+  const [contaAberta, setContaAberta] = useState(false)
 
   // Quem já abriu pelo app instalado não precisa da aba que ensina a instalar.
   const [total] = useState(() => (abertoComoApp() ? ABAS.length - 1 : ABAS.length))
@@ -52,10 +49,8 @@ export default function App() {
 
   const fecharAgendamento = () => setModal({ aberto: false, servicoId: null })
 
-  const abrirConta = (tela: TelaConta = 'entrar', voltarAoAgendamento = false) =>
-    setModalConta({ tela, voltarAoAgendamento })
-
-  const fecharConta = () => setModalConta(null)
+  const abrirConta = () => setContaAberta(true)
+  const fecharConta = () => setContaAberta(false)
 
   const irPara = (indice: number) => setAba(Math.max(0, Math.min(total - 1, indice)))
 
@@ -130,7 +125,7 @@ export default function App() {
         conta={conta}
         aoTrocarAba={irPara}
         aoAgendar={() => abrirAgendamento()}
-        aoAbrirConta={() => abrirConta()}
+        aoAbrirConta={abrirConta}
       />
 
       {/* Abas logo abaixo do cabeçalho (no celular); no computador ficam no cabeçalho. */}
@@ -184,15 +179,14 @@ export default function App() {
       </main>
 
 
-      {modal.aberto && (
+      {/* Agendar exige conta: sem ela, só a porta de entrada aparece. */}
+      {conta && modal.aberto && (
         <ModalAgendamento
           servicos={servicos}
           config={config}
           servicoInicialId={modal.servicoId}
           online={online}
-          pausado={modalConta !== null}
           aoFechar={fecharAgendamento}
-          aoAbrirConta={(tela) => abrirConta(tela, true)}
           aoVerMeusHorarios={() => {
             fecharAgendamento()
             abrirConta()
@@ -200,17 +194,26 @@ export default function App() {
         />
       )}
 
-      {/* Depois do agendamento no DOM: fica por cima quando os dois estão abertos. */}
-      {modalConta && (
+      {conta && contaAberta && (
         <ModalConta
-          telaInicial={modalConta.tela}
+          telaInicial="entrar"
           config={config}
-          voltarAoAgendamento={modalConta.voltarAoAgendamento}
           aoFechar={fecharConta}
           aoAgendar={() => {
             fecharConta()
             abrirAgendamento()
           }}
+        />
+      )}
+
+      {/* Porta de entrada: na primeira vez (ou depois de sair), antes de tudo. */}
+      {!conta && (
+        <ModalConta
+          obrigatorio
+          telaInicial="criar"
+          config={config}
+          aoFechar={() => {}}
+          aoAgendar={() => {}}
         />
       )}
     </div>

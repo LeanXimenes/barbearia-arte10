@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Assinatura, ConfigBarbearia, Plano } from '../lib/tipos'
 import { lerCliente, salvarCliente } from '../lib/clienteSalvo'
+import { useConta } from '../hooks/useConta'
 import { textoValidade } from '../lib/planos'
 import { solicitarPlano } from '../servicos/api'
 import {
@@ -28,7 +29,11 @@ interface Props {
 }
 
 export function ModalPlano({ plano, config, aoFechar }: Props) {
-  const [salvo] = useState(() => lerCliente())
+  // O plano sai no nome e no número da conta (dá para trocar, se for para outra pessoa).
+  const { conta } = useConta()
+  const [salvo] = useState(() =>
+    conta ? { nome: conta.nome, telefone: conta.telefone } : lerCliente(),
+  )
   const [usandoSalvo, setUsandoSalvo] = useState(salvo !== null)
   const [nome, setNome] = useState(salvo?.nome ?? '')
   const [telefone, setTelefone] = useState(salvo ? mascararTelefone(salvo.telefone) : '')

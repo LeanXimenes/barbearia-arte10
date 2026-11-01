@@ -224,6 +224,12 @@
 
 /* Calendário ------------------------------------------------------- */
 
+.calendario__dica {
+  margin-bottom: 14px;
+  font-size: 0.86rem;
+  color: var(--texto-suave);
+}
+
 .calendario__topo {
   display: flex;
   align-items: center;
@@ -233,18 +239,15 @@
 }
 
 .calendario__mes {
+  flex: 1;
+  text-align: center;
   font-family: var(--fonte-titulo);
-  font-size: 1.25rem;
-}
-
-.calendario__nav {
-  display: flex;
-  gap: 6px;
+  font-size: 1.35rem;
 }
 
 .calendario__seta {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -285,25 +288,36 @@
   gap: 4px;
 }
 
+.calendario__grade--carregando {
+  animation: piscar 1.2s ease-in-out infinite;
+}
+
+@keyframes piscar {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .dia {
+  position: relative;
   aspect-ratio: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 1px;
   border-radius: var(--raio-sm);
   border: 1px solid transparent;
-  font-size: 0.92rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--texto);
-  background: rgba(14, 32, 71, 0.3);
-  transition: border-color var(--transicao), background var(--transicao), color var(--transicao);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--transicao),
+    background var(--transicao),
+    color var(--transicao),
+    transform var(--transicao);
   min-height: 44px;
-}
-
-.dia:hover:not(:disabled) {
-  border-color: var(--ouro-600);
 }
 
 .dia--vazio {
@@ -311,30 +325,59 @@
   pointer-events: none;
 }
 
+/* Dia com horário livre: dourado e fácil de tocar. */
+.dia--livre {
+  color: var(--ouro-300);
+  background: rgba(233, 200, 79, 0.1);
+  border-color: rgba(233, 200, 79, 0.35);
+}
+
+.dia--livre:hover {
+  border-color: var(--ouro-400);
+  background: rgba(233, 200, 79, 0.18);
+  transform: translateY(-1px);
+}
+
+/* Fechado ou lotado: apagado, sem riscado. */
 .dia--indisponivel {
   color: var(--texto-fraco);
-  background: rgba(14, 32, 71, 0.14);
+  background: rgba(14, 32, 71, 0.18);
   cursor: not-allowed;
-  text-decoration: line-through;
-  text-decoration-color: rgba(154, 168, 198, 0.4);
+}
+
+.dia--passado {
+  opacity: 0.35;
+  background: none;
+}
+
+.dia--hoje {
+  border-color: var(--texto-suave);
+}
+
+.dia__hoje {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
 .dia--selecionado {
   background: linear-gradient(135deg, var(--ouro-400), var(--ouro-600));
   color: #1a1204;
   border-color: transparent;
-  font-weight: 700;
+  font-weight: 800;
+  box-shadow: 0 8px 20px -10px rgba(233, 200, 79, 0.9);
 }
 
-.dia__ponto {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--ouro-500);
-}
-
-.dia--selecionado .dia__ponto {
-  background: rgba(26, 18, 4, 0.55);
+.calendario__vazio {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--raio-sm);
+  border: 1px dashed var(--borda-suave);
+  font-size: 0.86rem;
+  color: var(--texto-suave);
+  text-align: center;
 }
 
 .legenda {
@@ -360,8 +403,120 @@
 }
 
 .legenda__amostra--livre {
-  background: rgba(14, 32, 71, 0.8);
-  border-color: var(--ouro-600);
+  background: rgba(233, 200, 79, 0.18);
+  border-color: rgba(233, 200, 79, 0.6);
+}
+
+.legenda__amostra--hoje {
+  border-color: var(--texto-suave);
+}
+
+/* Dia escolhido + "Escolher outro dia" ------------------------------ */
+
+.dia-escolhido {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  background: rgba(233, 200, 79, 0.06);
+}
+
+.dia-escolhido__linha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dia-escolhido__icone {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(233, 200, 79, 0.14);
+  color: var(--ouro-400);
+}
+
+.dia-escolhido__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.dia-escolhido__titulo {
+  font-family: var(--fonte-titulo);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ouro-300);
+}
+
+.dia-escolhido__sub {
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+}
+
+.dia-escolhido__livres {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #bbf7d0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.botao-outro-dia {
+  margin-top: 12px;
+  width: 100%;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ouro-500);
+  background: rgba(233, 200, 79, 0.08);
+  color: var(--ouro-300);
+  font-size: 1rem;
+  font-weight: 700;
+  transition:
+    background var(--transicao),
+    transform var(--transicao);
+}
+
+.botao-outro-dia:hover {
+  background: rgba(233, 200, 79, 0.16);
+  transform: translateY(-1px);
+}
+
+.vazio--dia {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.proximo-livre {
+  justify-content: space-between;
+  text-align: left;
+}
+
+.proximo-livre__texto {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.proximo-livre__rotulo {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
 }
 
 .legenda__amostra--ocupado {

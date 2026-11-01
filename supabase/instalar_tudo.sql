@@ -3334,7 +3334,9 @@ grant execute on function public.excluir_plano(uuid)              to authenticat
 -- =====================================================================
 -- O cliente cria a conta com nome, celular (obrigatório e válido) e, se
 -- quiser, e-mail. Depois entra com o celular OU o e-mail e a senha.
--- Logado, ele agenda sem digitar nada e vê os horários que marcou.
+-- O site pede a conta na primeira vez que abre; depois o cliente fica
+-- logado (a sessão não vence sozinha), agenda sem digitar nada e vê os
+-- horários que marcou.
 --
 -- Não usa o Supabase Auth de propósito: lá, quem entra vira o papel
 -- "authenticated", que é o da equipe do app, e o Auth pediria SMS pago
@@ -3521,7 +3523,8 @@ set search_path = public, extensions, pg_temp
 as $$
 declare
   v_token  text        := encode(gen_random_bytes(32), 'hex');
-  v_expira timestamptz := now() + interval '180 days';
+  -- O cliente fica logado "para sempre": só sai tocando em Sair.
+  v_expira timestamptz := now() + interval '10 years';
 begin
   -- Faxina: sessões vencidas saem e cada conta fica com no máximo 10.
   delete from public.sessoes_conta
@@ -3567,7 +3570,7 @@ begin
 
   if v_conta is not null and v_usada < now() - interval '1 day' then
     update public.sessoes_conta
-       set usada_em = now(), expira_em = now() + interval '180 days'
+       set usada_em = now(), expira_em = now() + interval '10 years'
      where token_hash = v_hash;
   end if;
 

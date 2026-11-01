@@ -1645,6 +1645,13 @@ await teste('conta criada: senha e sessão nunca ficam em texto no banco', async
     r.sessao.token,
   ])
   igual(s.n, 0, 'código de sessão guardado em texto')
+  // Fica logado "para sempre": a sessão não vence sozinha.
+  const prazo = await umaK(
+    `select expira_em > now() + interval '9 years' as longe from public.sessoes_conta
+      where token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex')`,
+    [r.sessao.token]
+  )
+  verdadeiro(prazo?.longe, 'a sessão vence cedo demais')
   TOKEN_MARIA = r.sessao.token
 })
 

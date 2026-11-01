@@ -190,9 +190,10 @@ agendamentos, clientes nem os seus dados**.
 - O cliente cria a conta com **nome, celular e senha** (o e-mail é opcional).
   O celular precisa ser um número brasileiro de verdade (DDD que existe,
   9 na frente). Depois ele entra com o **celular ou o e-mail**.
+- **A conta é obrigatória:** na primeira vez que abre o site, o cliente entra
+  ou cria a conta. Depois fica logado sempre (só sai tocando em "Sair").
 - Logado, ele agenda **sem digitar nome nem número** e vê, em "Minha conta",
   os horários que marcou (inclusive os que o dono cancelou).
-- Quem não quiser conta continua agendando como antes.
 - Não usa o "Authentication" do Supabase nem SMS: não há nada para configurar
   no painel. A senha fica guardada com bcrypt e 5 senhas erradas travam
   aquele login por 15 minutos.
