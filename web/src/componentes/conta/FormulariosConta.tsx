@@ -10,6 +10,9 @@ import {
   telefoneValido,
 } from '../../lib/formato'
 import { IconeAlerta, IconeWhatsapp } from '../Icones'
+import { VerificacaoHumana } from './VerificacaoHumana'
+
+const MSG_CONFIRME_HUMANO = 'Confirme que você não é um robô (a caixinha acima do botão).'
 
 interface PropsForm {
   config: ConfigBarbearia | null
@@ -158,11 +161,16 @@ export function FormEntrar({
 // ---------------------------------------------------------------------
 
 export function FormCriarConta({
+  config,
   aoEnviar,
   aoConcluir,
   aoEntrarCom,
 }: PropsForm & { aoEntrarCom: (login: string) => void }) {
   const { criar } = useConta()
+  // Anti-robô: só aparece quando a barbearia configurou o Turnstile.
+  const chaveTurnstile = config?.turnstile_site_key ?? null
+  const [tokenHumano, setTokenHumano] = useState<string | null>(null)
+  const [rodada, setRodada] = useState(0)
   // Quem já agendou neste aparelho começa com nome e número preenchidos.
   const [salvo] = useState(() => lerCliente())
   const [nome, setNome] = useState(salvo?.nome ?? '')
@@ -184,15 +192,23 @@ export function FormCriarConta({
     setTentou(true)
     const emailOk = email.trim() === '' || emailValido(email)
     if (!nomeValido(nome) || !telefoneValido(telefone) || !emailOk || senha.length < 6) return
+    if (chaveTurnstile && !tokenHumano) {
+      setErro({ codigo: 'VERIFICACAO_HUMANA', mensagem: MSG_CONFIRME_HUMANO })
+      return
+    }
 
     setEnviando(true)
     aoEnviar(true)
     setErro(null)
-    const r = await criar({ nome, telefone, email, senha })
+    const r = await criar({ nome, telefone, email, senha, turnstile: tokenHumano })
     setEnviando(false)
     aoEnviar(false)
     if (r.ok) aoConcluir()
-    else setErro({ codigo: r.erro, mensagem: r.mensagem })
+    else {
+      setErro({ codigo: r.erro, mensagem: r.mensagem })
+      // O token vale uma vez só: a próxima tentativa precisa de um novo.
+      if (chaveTurnstile) setRodada((n) => n + 1)
+    }
   }
 
   return (
@@ -274,6 +290,10 @@ export function FormCriarConta({
             erro={senhaRuim ? 'A senha precisa ter pelo menos 6 caracteres.' : null}
             dica="Pelo menos 6 caracteres."
           />
+
+          {chaveTurnstile && (
+            <VerificacaoHumana chaveDoSite={chaveTurnstile} rodada={rodada} aoMudar={setTokenHumano} />
+          )}
         </form>
 
         {erro && (

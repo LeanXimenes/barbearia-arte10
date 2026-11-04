@@ -40,6 +40,8 @@ export interface ConfigBarbearia {
   granularidade_minutos: number
   antecedencia_minima_minutos: number
   antecedencia_maxima_dias: number
+  /** Chave pública do Cloudflare Turnstile (anti-robô no cadastro). Null = desligado. */
+  turnstile_site_key?: string | null
 }
 
 export interface HorarioFuncionamento {

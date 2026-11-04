@@ -17,7 +17,8 @@ toda regra que importa mora no banco:
 | Checagem antes de cada chamada | `private.checar_requisicao()` (o `db_pre_request` do PostgREST): freio por IP e por rota, `/rpc` só por POST e pedido de no máximo 16 KB. |
 | Freios dentro das funções | Por IP e por conta (login, conta nova, agendar, cancelar, plano, aparelho). Valem mesmo que a checagem acima seja desligada. |
 | Travas de negócio | Sem sobreposição de horário (constraint de exclusão), idempotência, agendamento imutável, até 3 horários em aberto por número e freio geral de 20 reservas e 20 contas novas a cada 10 minutos. |
-| CSP e cabeçalhos | O navegador só roda scripts do próprio site e só conversa com o Supabase deste projeto (`web/public/_headers`). |
+| Anti-robô no cadastro | Cloudflare Turnstile: o site mostra o desafio e o **banco** confere o token na Cloudflare antes de criar a conta (migração 17). |
+| CSP e cabeçalhos | O navegador só roda scripts do próprio site (e o desafio do Turnstile) e só conversa com o Supabase deste projeto (`web/public/_headers`). |
 
 ### Limites (os contadores ficam em `private.limites`, no banco)
 
@@ -45,13 +46,40 @@ novo". Depois do tempo, volta sozinho.
 inventar o começo. IP interno ou inválido não é travado: na dúvida, ninguém é
 barrado por engano.
 
+## Anti-robô (Cloudflare Turnstile)
+
+O desafio aparece em **Criar conta**. Quem confere é o banco: `criar_conta`
+pergunta à Cloudflare (`siteverify`) se o token vale. Sem token, ou com token
+recusado, a conta não é criada ("Confirme que você não é um robô").
+
+Liga sozinho quando as **duas** chaves estão no banco. Sem elas, o cadastro
+segue como antes, com os limites por IP:
+
+```sql
+-- 1) Chave PÚBLICA (Site Key): o site lê para mostrar o desafio.
+update public.config_barbearia set turnstile_site_key = 'COLE_A_SITE_KEY' where id;
+
+-- 2) Chave SECRETA (Secret Key): só o banco lê. Nunca vai para o site nem para o git.
+insert into private.segredos (chave, valor) values ('turnstile_secret', 'COLE_A_SECRET_KEY')
+  on conflict (chave) do update set valor = excluded.valor, updated_at = now();
+```
+
+As chaves ficam no Cloudflare: **Turnstile → o widget "Arte 10" → Settings**.
+O widget precisa ter o hostname `arte10barbarbearia.netlify.app`.
+
+Se a Cloudflare não responder, ou se a chave secreta estiver errada, o cadastro
+**não trava**. Fica registrado como `turnstile_indisponivel` e os limites por IP
+continuam valendo. Para desligar:
+`update public.config_barbearia set turnstile_site_key = null where id;`
+
 ## Monitoramento
 
 No **SQL Editor** do Supabase:
 
 ```sql
 -- Quem foi barrado e logins travados (últimos 30 dias)
-select criado_em, tipo, chave, ip from private.eventos_seguranca order by id desc limit 50;
+select criado_em, tipo, chave, ip, detalhe from private.eventos_seguranca order by id desc limit 50;
+-- tipos: limite, login_travado, turnstile_recusado, turnstile_indisponivel
 
 -- A checagem antes de cada chamada está ligada?
 select r.rolname, s.setconfig from pg_db_role_setting s
@@ -103,12 +131,9 @@ node scripts\servir-dist.mjs dist 5181     # abre http://localhost:5181
 ## O que ainda depende de fora
 
 - **Robôs com muitos IPs** (rede de computadores invadidos) conseguem passar
-  pelos limites por IP. O freio geral de 20 reservas e 20 contas a cada 10
-  minutos segura o estrago, mas um ataque assim também pode travar o cadastro
-  de clientes de verdade por alguns minutos. Contra isso, só um desafio
-  anti-robô no cadastro (por exemplo, o **Cloudflare Turnstile**, gratuito),
-  conferido no servidor. Ele exige uma conta no Cloudflare e uma chave secreta
-  no Supabase, então **não foi ativado** sem a sua autorização.
+  pelos limites por IP. Com o Turnstile ligado, cada conta nova exige resolver
+  o desafio. Sem ele (chaves não configuradas), o freio geral de 20 contas a
+  cada 10 minutos é o que segura.
 - **Leitura das tabelas públicas** (serviços, horários, planos e promoções)
   não tem freio por IP: o PostgREST faz essas leituras em modo só de leitura,
   e não há como gravar o contador ali. São tabelas pequenas, e o Supabase corta

@@ -459,3 +459,9 @@
   font-weight: 700;
   color: var(--texto);
 }
+
+/* Desafio anti-robô (Cloudflare Turnstile) no cadastro */
+.verificacao-humana {
+  margin-top: 14px;
+  min-height: 65px;
+}

@@ -399,3 +399,87 @@ test('horários e dias livres continuam funcionando para o site (agora contados)
   )
   assert.ok(horas.some((h) => h.disponivel), 'nenhum horário livre')
 })
+
+// ---------------------------------------------------------------------
+// Turnstile (migração 17): o banco confere o token na Cloudflare.
+// A chamada de rede é trocada por respostas fixas (como as da Cloudflare).
+// ---------------------------------------------------------------------
+const dbt = await criarBanco()
+const umaT = async (sql, params = []) => (await dbt.query(sql, params)).rows[0]
+await dbt.exec(`
+  create or replace function private.turnstile_siteverify(p_secret text, p_token text)
+  returns jsonb language sql as $$
+    select case p_token
+      when 'TOKEN_BOM'        then '{"success": true, "action": "criar_conta", "hostname": "arte10barbarbearia.netlify.app"}'
+      when 'TOKEN_SEM_ACAO'   then '{"success": true, "action": "", "hostname": "arte10barbarbearia.netlify.app"}'
+      when 'TOKEN_OUTRA_ACAO' then '{"success": true, "action": "entrar"}'
+      when 'CLOUDFLARE_CAIU'  then '{"indisponivel": true, "erro": "timeout"}'
+      when 'SEGREDO_ERRADO'   then '{"success": false, "error-codes": ["invalid-input-secret"]}'
+      else '{"success": false, "error-codes": ["invalid-input-response"]}'
+    end::jsonb
+  $$;
+`)
+let numeroT = 0
+const contaT = async (token) => {
+  numeroT += 1
+  const tel = `1798${String(10000000 + numeroT).slice(1)}`
+  return comoPedido(dbt, { caminho: '/rpc/criar_conta' }, async () =>
+    (await umaT('select public.criar_conta($1, $2, $3, null, $4) as r', ['Cliente Turnstile', tel, 'CorteBom2026', token])).r
+  )
+}
+const ligarTurnstile = async ({ site = '0x4AAAAAAAteste_site', segredo = '0x4AAAAAAAteste_segredo' } = {}) => {
+  await dbt.query('update public.config_barbearia set turnstile_site_key = $1 where id', [site])
+  await dbt.query('delete from private.segredos where chave = $1', ['turnstile_secret'])
+  if (segredo) await dbt.query("insert into private.segredos (chave, valor) values ('turnstile_secret', $1)", [segredo])
+}
+
+test('Turnstile desligado (sem as duas chaves): o cadastro segue como antes', async () => {
+  assert.equal((await contaT(null)).ok, true)
+  // Só a chave pública (o site já mostra o desafio) ainda não trava ninguém.
+  await ligarTurnstile({ segredo: null })
+  assert.equal((await contaT(null)).ok, true)
+})
+
+test('Turnstile ligado: sem token ou com token recusado não cria conta', async () => {
+  await ligarTurnstile()
+  for (const token of [null, '', 'TOKEN_FALSO', 'TOKEN_OUTRA_ACAO', 'x'.repeat(3000)]) {
+    const r = await contaT(token)
+    assert.equal(r.erro, 'VERIFICACAO_HUMANA', `token ${String(token).slice(0, 20)}`)
+  }
+  const ev = await umaT("select count(*)::int as n from private.eventos_seguranca where tipo = 'turnstile_recusado'")
+  assert.ok(ev.n >= 2, 'recusa não registrada')
+})
+
+test('Turnstile ligado: token válido cria a conta', async () => {
+  await ligarTurnstile()
+  const r = await contaT('TOKEN_BOM')
+  assert.equal(r.ok, true, r.mensagem)
+  assert.equal((await contaT('TOKEN_SEM_ACAO')).ok, true)
+})
+
+test('Turnstile: Cloudflare fora do ar ou chave secreta errada não trava os clientes (e fica registrado)', async () => {
+  await ligarTurnstile()
+  assert.equal((await contaT('CLOUDFLARE_CAIU')).ok, true)
+  assert.equal((await contaT('SEGREDO_ERRADO')).ok, true)
+  const ev = await umaT("select count(*)::int as n from private.eventos_seguranca where tipo = 'turnstile_indisponivel'")
+  assert.equal(ev.n, 2)
+})
+
+test('Turnstile: a chave pública o site lê; a secreta e a conferência ficam fechadas', async () => {
+  await ligarTurnstile()
+  const publica = await comoAnonimo(dbt, () => umaT('select turnstile_site_key from public.config_barbearia'))
+  assert.equal(publica.turnstile_site_key, '0x4AAAAAAAteste_site')
+  for (const sql of [
+    'select * from private.segredos',
+    "select private.validar_turnstile('TOKEN_BOM')",
+    "select private.turnstile_siteverify('a', 'b')",
+  ]) {
+    await assert.rejects(() => comoAnonimo(dbt, () => dbt.query(sql)), /permission denied/, sql)
+  }
+  // Chave pública com formato estranho não entra (vai parar no HTML do site).
+  await assert.rejects(
+    () => dbt.query("update public.config_barbearia set turnstile_site_key = '<script>' where id"),
+    /config_turnstile_site_key_valida/
+  )
+  await dbt.close()
+})

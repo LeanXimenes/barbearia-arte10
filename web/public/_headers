@@ -5,8 +5,9 @@
 # Content-Security-Policy: o navegador só roda scripts do próprio site e só
 # conversa com o Supabase deste projeto. Se um dia o projeto do Supabase
 # mudar, troque o endereço em connect-src (https e wss).
+# challenges.cloudflare.com = desafio anti-robô (Turnstile) do cadastro.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://iwekfmxrmmmxzjymtsyq.supabase.co wss://iwekfmxrmmmxzjymtsyq.supabase.co; manifest-src 'self'; worker-src 'self'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://iwekfmxrmmmxzjymtsyq.supabase.co wss://iwekfmxrmmmxzjymtsyq.supabase.co; manifest-src 'self'; worker-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

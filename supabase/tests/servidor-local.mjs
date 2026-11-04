@@ -92,6 +92,21 @@ const IDENTIFICADOR = /^[a-z_][a-z0-9_]*$/
 
 // Os dados e horários REAIS do seed: a demonstração mostra o site como ele vai ficar.
 const db = await criarBanco({ agendaDeTeste: false })
+
+// Anti-robô (Turnstile) na demonstração, com as chaves de TESTE oficiais da
+// Cloudflare: o desafio aparece de verdade e sempre passa. Sem internet para
+// o banco local, a conferência responde como a Cloudflare responderia.
+await db.exec(`
+  update public.config_barbearia set turnstile_site_key = '1x00000000000000000000AA' where id;
+  insert into private.segredos (chave, valor) values ('turnstile_secret', '1x0000000000000000000000000000000AA')
+    on conflict (chave) do update set valor = excluded.valor;
+  create or replace function private.turnstile_siteverify(p_secret text, p_token text)
+  returns jsonb language sql as $f$
+    select case when p_secret like '1x%' and p_token = 'XXXX.DUMMY.TOKEN.XXXX'
+      then '{"success": true, "action": "criar_conta", "hostname": "localhost"}'
+      else '{"success": false, "error-codes": ["invalid-input-response"]}' end::jsonb
+  $f$;
+`)
 const ADMIN_ID = randomUUID()
 await db.query('insert into auth.users (id, email) values ($1, $2)', [ADMIN_ID, ADMIN_EMAIL])
 await db.query("insert into public.administradores (user_id, nome) values ($1, 'Dono (demonstração)')", [ADMIN_ID])

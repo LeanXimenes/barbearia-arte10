@@ -77,7 +77,7 @@ export async function carregarConfig(): Promise<ConfigBarbearia | null> {
     .from('config_barbearia')
     .select(
       'nome, fuso, telefone_whatsapp, instagram, endereco, cidade, uf, mapa_url, ' +
-        'granularidade_minutos, antecedencia_minima_minutos, antecedencia_maxima_dias',
+        'granularidade_minutos, antecedencia_minima_minutos, antecedencia_maxima_dias, turnstile_site_key',
     )
     .maybeSingle()
 
@@ -263,6 +263,8 @@ export interface DadosNovaConta {
   telefone: string
   senha: string
   email: string
+  /** Token do desafio anti-robô (o banco confere na Cloudflare). */
+  turnstile?: string | null
 }
 
 export async function criarConta(dados: DadosNovaConta): Promise<RespostaConta> {
@@ -271,6 +273,7 @@ export async function criarConta(dados: DadosNovaConta): Promise<RespostaConta> 
     p_telefone: dados.telefone,
     p_senha: dados.senha,
     p_email: dados.email.trim() || null,
+    p_turnstile: dados.turnstile ?? null,
   })
   return respostaDaFuncao<RespostaConta>(resposta)
 }
