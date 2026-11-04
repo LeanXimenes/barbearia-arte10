@@ -19,6 +19,38 @@
         "supabase/tests/servidor-local.mjs"
       ],
       "port": 54321
+    },
+    {
+      "name": "site-csp-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "web/scripts/servir-dist.mjs",
+        "web/dist-demo",
+        "5180",
+        "--demo"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "site-csp-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "web/scripts/servir-dist.mjs",
+        "web/dist",
+        "5181"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "painel-csp-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "web/scripts/servir-dist.mjs",
+        "web/dist-painel-demo",
+        "5182",
+        "--demo"
+      ],
+      "port": 5182
     }
   ]
 }

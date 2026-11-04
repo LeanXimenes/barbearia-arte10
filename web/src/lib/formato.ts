@@ -153,7 +153,23 @@ export function linkWhatsapp(telefone: string | null, mensagem?: string): string
 
 export function linkInstagram(usuario: string | null): string | null {
   if (!usuario) return null
-  return `https://instagram.com/${usuario.replace(/^@/, '')}`
+  const nome = usuario.trim().replace(/^@/, '')
+  if (!nome) return null
+  return `https://instagram.com/${encodeURIComponent(nome)}`
+}
+
+/**
+ * Só deixa passar link http(s). Um "javascript:" ou "data:" salvo na
+ * configuração viraria um ataque contra quem clica no site.
+ */
+export function linkSeguro(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const u = new URL(url.trim())
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null
+  } catch {
+    return null
+  }
 }
 
 export function linkMapa(config: {
@@ -162,7 +178,8 @@ export function linkMapa(config: {
   cidade: string | null
   uf: string | null
 }): string | null {
-  if (config.mapa_url) return config.mapa_url
+  const salvo = linkSeguro(config.mapa_url)
+  if (salvo) return salvo
   const partes = [config.endereco, config.cidade, config.uf].filter(Boolean)
   if (partes.length === 0) return null
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(partes.join(', '))}`

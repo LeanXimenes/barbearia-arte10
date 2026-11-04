@@ -12,7 +12,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Aplicacao de pagina unica: qualquer rota cai no index.html
 [[redirects]]
@@ -20,15 +20,6 @@
   to = "/index.html"
   status = 200
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
-
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+# Cabeçalhos de segurança (CSP, frame, etc.): ficam em web/public/_headers,
+# que vale também para o painel publicado arrastando a pasta. Um lugar só,
+# para os dois sites nunca ficarem diferentes.

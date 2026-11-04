@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Assinatura, Conta, Servico } from '../../lib/tipos'
 import { consultarMeuPlano } from '../../servicos/api'
-import { dataCurta, duracao, moeda, telefoneBonito, telefoneValido } from '../../lib/formato'
+import { useConta } from '../../hooks/useConta'
+import { dataCurta, duracao, moeda, telefoneBonito } from '../../lib/formato'
 
 interface Props {
   servico: Servico
@@ -14,7 +15,8 @@ interface Props {
 
 /** Último passo do agendamento: revisão e "Agendando pela sua conta". */
 export function FormularioDados({ servico, data, horario, horarioFim, conta }: Props) {
-  const plano = usePlanoDoTelefone(servico.usa_plano ? conta.telefone : '')
+  const { token } = useConta()
+  const plano = usePlanoDaConta(servico.usa_plano ? token : null)
 
   return (
     <div>
@@ -66,16 +68,16 @@ export function FormularioDados({ servico, data, horario, horarioFim, conta }: P
   )
 }
 
-/** Plano ativo com cortes para este telefone (para avisar antes de confirmar). */
-function usePlanoDoTelefone(telefone: string): Assinatura | null {
+/** Plano ativo com cortes da conta logada (para avisar antes de confirmar). */
+function usePlanoDaConta(token: string | null): Assinatura | null {
   const [plano, setPlano] = useState<Assinatura | null>(null)
 
   useEffect(() => {
     setPlano(null)
-    if (!telefoneValido(telefone)) return
+    if (!token) return
     let vivo = true
     const t = window.setTimeout(() => {
-      consultarMeuPlano(telefone)
+      consultarMeuPlano(token)
         .then((p) => {
           if (vivo && p && p.status === 'ativa' && p.restantes > 0) setPlano(p)
         })
@@ -87,7 +89,7 @@ function usePlanoDoTelefone(telefone: string): Assinatura | null {
       vivo = false
       window.clearTimeout(t)
     }
-  }, [telefone])
+  }, [token])
 
   return plano
 }

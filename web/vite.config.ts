@@ -31,7 +31,9 @@ function raizDoPainel(): Plugin {
           '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
           '<meta http-equiv="refresh" content="0; url=/admin/"><title>Painel · Arte 10</title>' +
           '<meta name="robots" content="noindex"></head>' +
-          '<body><a href="/admin/">Abrir o painel</a><script>location.replace("/admin/")</script></body></html>\n',
+          // Sem <script> embutido: a política de segurança (CSP) do site não permite.
+          // O _redirects e o meta refresh já levam para /admin/.
+          '<body><a href="/admin/">Abrir o painel</a></body></html>\n',
       })
     },
   }

@@ -31,7 +31,9 @@ self.addEventListener('push', (evento) => {
 // Tocar no aviso abre o painel na agenda daquele dia.
 self.addEventListener('notificationclick', (evento) => {
   evento.notification.close()
-  const destino = new URL(evento.notification.data?.url || '/admin/', self.location.origin).href
+  const pedido = new URL(evento.notification.data?.url || '/admin/', self.location.origin)
+  // O aviso só abre páginas do próprio painel, nunca um endereço de fora.
+  const destino = pedido.origin === self.location.origin ? pedido.href : `${self.location.origin}/admin/`
 
   evento.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {

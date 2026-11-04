@@ -19,6 +19,22 @@ export const MSG_CONTA_FALHA = 'Não foi possível concluir agora. Tente de novo
 export const MSG_FALHA_CARREGAR =
   'Não conseguimos carregar as informações agora. Verifique sua conexão e tente novamente.'
 
+export const MSG_MUITOS_PEDIDOS =
+  'Muitos pedidos seguidos deste aparelho. Espere alguns minutos e tente de novo.'
+
+/**
+ * O banco respondeu 429: muitos pedidos seguidos do mesmo aparelho/rede.
+ * Não é falha de conexão — tentar de novo na hora não adianta.
+ */
+export class ErroMuitosPedidos extends Error {
+  readonly segundos: number | null
+  constructor(mensagem = MSG_MUITOS_PEDIDOS, segundos: number | null = null) {
+    super(mensagem)
+    this.name = 'ErroMuitosPedidos'
+    this.segundos = segundos
+  }
+}
+
 /** Erros que indicam problema de rede/servidor indisponível. */
 export function pareceFalhaDeRede(erro: unknown): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
@@ -47,6 +63,7 @@ export function mensagemBruta(erro: unknown): string {
 
 /** Mensagem para o usuário a partir de uma falha de chamada ao Supabase. */
 export function mensagemDeFalha(erro: unknown, padrao = MSG_FALHA_GENERICA): string {
+  if (erro instanceof ErroMuitosPedidos) return erro.message
   if (pareceFalhaDeRede(erro)) return MSG_SEM_CONEXAO
   return padrao
 }

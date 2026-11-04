@@ -9,6 +9,9 @@ import {
   hora,
   primeiroNome,
   linkWhatsapp,
+  linkInstagram,
+  linkMapa,
+  linkSeguro,
   mascararTelefone,
   moeda,
   nomeValido,
@@ -202,5 +205,25 @@ describe('dataCurtaDoInstante', () => {
   })
   it('em outro ano mostra o ano (plano longo que vence no ano seguinte)', () => {
     expect(dataCurtaDoInstante('2027-01-15T15:00:00Z', 'America/Sao_Paulo', agora)).toBe('15/01/2027')
+  })
+})
+
+describe('links seguros (a configuração vem do banco)', () => {
+  it('link do mapa só aceita http(s)', () => {
+    const base = { endereco: 'Rua A, 10', cidade: 'Santa Albertina', uf: 'SP' }
+    expect(linkMapa({ ...base, mapa_url: 'https://maps.app.goo.gl/abc' })).toBe('https://maps.app.goo.gl/abc')
+    // "javascript:" ou "data:" caem para a busca do Google Maps pelo endereço.
+    for (const ruim of ['javascript:alert(1)', 'JavaScript:alert(1)', ' data:text/html,oi', 'vbscript:x']) {
+      expect(linkMapa({ ...base, mapa_url: ruim })).toContain('https://www.google.com/maps/search/')
+    }
+    expect(linkSeguro('javascript:alert(1)')).toBeNull()
+    expect(linkSeguro('não é link')).toBeNull()
+    expect(linkSeguro('http://exemplo.com/x')).toBe('http://exemplo.com/x')
+  })
+
+  it('Instagram não deixa o nome sair do instagram.com', () => {
+    expect(linkInstagram('@aquiles.hiroshi')).toBe('https://instagram.com/aquiles.hiroshi')
+    expect(linkInstagram('../../evil')).toBe('https://instagram.com/..%2F..%2Fevil')
+    expect(linkInstagram('  ')).toBeNull()
   })
 })

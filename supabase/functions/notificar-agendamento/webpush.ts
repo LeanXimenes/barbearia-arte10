@@ -218,17 +218,51 @@ export function montarPayloadWeb(n: NotificacaoReservada) {
   }
 }
 
+// Só os serviços de push dos navegadores (Chrome/Android, Safari/iPhone,
+// Firefox, Edge). O banco já recusa outros endereços; aqui é a segunda trava:
+// sem ela, um endereço qualquer faria esta função mandar pedidos para fora.
+const SERVICOS_DE_PUSH = [
+  /^fcm\.googleapis\.com$/,
+  /^android\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /^push\.services\.mozilla\.com$/,
+  /^web\.push\.apple\.com$/,
+  /^[a-z0-9-]+\.notify\.windows\.com$/,
+]
+
+/** O endereço é de um serviço de push de verdade (https, porta padrão)? */
+export function endpointPushPermitido(endpoint: string): boolean {
+  if (typeof endpoint !== 'string' || endpoint.length > 2048) return false
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' || url.port !== '' || url.username || url.password) return false
+  return SERVICOS_DE_PUSH.some((re) => re.test(url.hostname))
+}
+
+/** Tempo máximo de cada envio: um serviço lento não prende a fila toda. */
+export const TEMPO_MAXIMO_PUSH_MS = 10_000
+
 /** Monta o pedido HTTP do push para um aparelho. */
 export async function montarPedidoWebPush(
   aparelho: AssinaturaWeb,
   n: NotificacaoReservada,
   chaves: ChavesVapid,
 ): Promise<{ url: string; init: RequestInit }> {
+  if (!endpointPushPermitido(aparelho.endpoint)) {
+    throw new Error('endereço de aviso fora dos serviços de push')
+  }
   const corpo = await criptografar(texto.encode(JSON.stringify(montarPayloadWeb(n))), aparelho)
   return {
     url: aparelho.endpoint,
     init: {
       method: 'POST',
+      // Serviço de push não redireciona: um redirecionamento é recusado.
+      redirect: 'error',
+      signal: AbortSignal.timeout(TEMPO_MAXIMO_PUSH_MS),
       headers: {
         Authorization: await cabecalhoVapid(aparelho.endpoint, chaves),
         'Content-Encoding': 'aes128gcm',

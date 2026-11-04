@@ -1,9 +1,17 @@
-# Cabeçalhos de segurança do Netlify (valem também no deploy de arrastar e soltar)
+# Cabeçalhos de segurança do Netlify — valem nos DOIS sites (o dos clientes,
+# publicado pelo GitHub, e o painel, publicado arrastando a pasta), porque a
+# pasta public/ vai junto nos dois builds. O HSTS o Netlify já manda sozinho.
+#
+# Content-Security-Policy: o navegador só roda scripts do próprio site e só
+# conversa com o Supabase deste projeto. Se um dia o projeto do Supabase
+# mudar, troque o endereço em connect-src (https e wss).
 /*
-  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://iwekfmxrmmmxzjymtsyq.supabase.co wss://iwekfmxrmmmxzjymtsyq.supabase.co; manifest-src 'self'; worker-src 'self'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

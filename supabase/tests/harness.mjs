@@ -82,15 +82,45 @@ export async function comoServico(db, fn) {
   return executarEmTransacao(db, 'service_role', null, fn)
 }
 
-async function executarEmTransacao(db, papel, userId, fn) {
+/**
+ * Por dentro do banco (dono das funções), sem papel da API. É como as
+ * funções da conta chamam o motor de agendamento e de planos.
+ */
+export async function comoInterno(db, fn) {
+  return executarEmTransacao(db, null, null, fn)
+}
+
+/**
+ * Um pedido HTTP de verdade, como o PostgREST monta: papel, cabeçalhos
+ * (o IP vem do cf-connecting-ip), método, caminho e transação só de
+ * leitura (GET) ou de escrita (POST).
+ */
+export async function comoPedido(
+  db,
+  { papel = 'anon', userId = null, ip = null, cabecalhos = {}, metodo = 'POST', caminho = '/rpc/x', somenteLeitura = false },
+  fn,
+) {
+  const extras = {
+    'request.headers': JSON.stringify({ ...(ip ? { 'cf-connecting-ip': ip } : {}), ...cabecalhos }),
+    'request.method': metodo,
+    'request.path': caminho,
+  }
+  return executarEmTransacao(db, papel, userId, fn, extras, somenteLeitura)
+}
+
+async function executarEmTransacao(db, papel, userId, fn, extras = {}, somenteLeitura = false) {
   const claims = userId
     ? JSON.stringify({ sub: userId, role: papel })
-    : JSON.stringify({ role: papel })
+    : JSON.stringify({ role: papel ?? 'postgres' })
 
   await db.exec('begin')
   try {
-    await db.query('select set_config($1, $2, true)', ['request.jwt.claims', claims])
-    await db.exec(`set local role ${papel}`)
+    if (somenteLeitura) await db.exec('set transaction read only')
+    await db.query('select set_config($1, $2, true)', ['request.jwt.claims', papel ? claims : ''])
+    for (const [nome, valor] of Object.entries(extras)) {
+      await db.query('select set_config($1, $2, true)', [nome, valor])
+    }
+    if (papel) await db.exec(`set local role ${papel}`)
     const resultado = await fn()
     await db.exec('commit')
     return resultado

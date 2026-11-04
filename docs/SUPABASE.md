@@ -190,13 +190,16 @@ agendamentos, clientes nem os seus dados**.
 - O cliente cria a conta com **nome, celular e senha** (o e-mail é opcional).
   O celular precisa ser um número brasileiro de verdade (DDD que existe,
   9 na frente). Depois ele entra com o **celular ou o e-mail**.
-- **A conta é obrigatória:** na primeira vez que abre o site, o cliente entra
-  ou cria a conta. Depois fica logado sempre (só sai tocando em "Sair").
+- **A conta é obrigatória** (e o banco também exige: não existe mais agendar
+  sem conta). Na primeira vez que abre o site, o cliente entra ou cria a conta.
+  Depois fica logado enquanto usar o site: a sessão vale 1 ano e renova a cada
+  dia de uso (só sai tocando em "Sair" ou depois de 1 ano sem abrir o site).
 - Logado, ele agenda **sem digitar nome nem número** e vê, em "Minha conta",
   os horários que marcou (inclusive os que o dono cancelou).
 - Não usa o "Authentication" do Supabase nem SMS: não há nada para configurar
-  no painel. A senha fica guardada com bcrypt e 5 senhas erradas travam
-  aquele login por 15 minutos.
+  no painel. A senha fica guardada com bcrypt, senhas óbvias (123456, o
+  próprio número…) são recusadas e 5 senhas erradas travam aquele login por
+  15 minutos. Limites por IP e por conta: veja [SEGURANCA.md](SEGURANCA.md).
 - **Cliente esqueceu a senha?** No SQL Editor, troque o número e a senha
   nova e rode (depois avise o cliente para entrar com ela):
 
@@ -230,6 +233,8 @@ Painel do iPhone, avisos e lembretes de 30 minutos: veja [PAINEL_E_AVISOS.md](PA
 | `tentativas_login` | Senhas erradas recentes (para travar quem fica chutando). Sem acesso pela API. |
 | `aparelhos_conta` | Celulares dos clientes que ligaram o lembrete (Web Push). Sem acesso pela API. |
 | `lembretes_enviados` | Que lembretes de 30 min já saíram (para não repetir). Sem acesso pela API. |
+| `private.limites` | Contadores dos freios (por IP, por conta, por rota). Sem acesso pela API. |
+| `private.eventos_seguranca` | Quem foi barrado por excesso e logins travados (30 dias). Sem acesso pela API. |
 
 ### Funções
 
@@ -237,12 +242,14 @@ Painel do iPhone, avisos e lembretes de 30 minutos: veja [PAINEL_E_AVISOS.md](PA
 |---|---|---|
 | `horarios_disponiveis(servico, data)` | site | Grade do dia, com `disponivel` e o motivo (`ocupado` / `bloqueado`). |
 | `dias_disponiveis(servico, início, fim)` | site | Por dia: abre? dentro da janela? quantos horários livres? |
-| `criar_agendamento(...)` | site | **Único** caminho de gravação. Revalida tudo, idempotente, com freio anti-robô. |
+| `criar_agendamento(...)` | interno | Motor de gravação: revalida tudo, idempotente, freio anti-robô. **Fechado para a API** — o site chega nele por `criar_agendamento_conta`. |
 | `criar_conta(nome, celular, senha, e-mail)` / `entrar(celular ou e-mail, senha)` / `sair(sessão)` | site | Conta do cliente. Devolvem a sessão. |
 | `minha_conta(sessão)` | site | Dados da conta e os horários marcados por ela. |
 | `criar_agendamento_conta(sessão, ...)` | site | Agenda com o nome e o número da conta (mesmas regras de `criar_agendamento`). |
 | `cancelar_meu_agendamento(sessão, id)` | site | O cliente cancela até 40 min antes; o dono recebe um aviso. |
-| `registrar_aparelho_conta(sessão, ...)` | site | Liga o lembrete de 30 min no celular do cliente (Web Push). |
+| `registrar_aparelho_conta(sessão, ...)` | site | Liga o lembrete de 30 min no celular do cliente (Web Push). Só serviços de push de verdade, até 5 por conta. |
+| `meu_plano_conta(sessão)` / `solicitar_plano_conta(sessão, plano, …)` | site | Plano da própria conta / pedir plano logado (os antigos por telefone foram fechados). |
+| `private.checar_requisicao()` | PostgREST | Roda antes de cada chamada à API: freio por IP e por rota, /rpc só por POST, tamanho do pedido. |
 | `proximos_agendamentos(dias)` | app e painel | Hoje e os próximos dias já marcados, com o telefone do cliente. |
 | `registrar_dispositivo_web(...)` | painel | Liga os avisos no iPhone do dono (Web Push). |
 | `enviar_lembretes()` | pg_cron | Lembrete 30 min antes, para o dono e para o cliente (uma vez só). |

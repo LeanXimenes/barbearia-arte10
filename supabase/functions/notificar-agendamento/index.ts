@@ -36,6 +36,7 @@ import {
   type ChavesVapid,
   classificarRespostaWebPush,
   lerChavesVapid,
+  endpointPushPermitido,
   montarPedidoWebPush,
 } from './webpush.ts'
 
@@ -140,7 +141,15 @@ async function enviarWebPush(aparelhos: AparelhoWeb[], notificacao: NotificacaoR
   const classes: ClasseResposta[] = []
   const invalidos: string[] = []
   const erros: string[] = []
-  for (const aparelho of aparelhos) {
+  // O banco guarda no máximo 5 por conta; 20 é folga para os aparelhos do dono.
+  for (const aparelho of aparelhos.slice(0, 20)) {
+    // Endereço fora dos serviços de push: nem tenta, e o aparelho é desligado.
+    if (!endpointPushPermitido(aparelho.endpoint)) {
+      classes.push('permanente')
+      invalidos.push(aparelho.id)
+      erros.push('web: endereço fora dos serviços de push')
+      continue
+    }
     try {
       const pedido = await montarPedidoWebPush(aparelho, notificacao, chaves)
       const resposta = await fetch(pedido.url, pedido.init)

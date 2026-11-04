@@ -11,6 +11,7 @@ import {
   lerChavesVapid,
   montarPayloadWeb,
   montarPedidoWebPush,
+  endpointPushPermitido,
 } from '../functions/notificar-agendamento/webpush.ts'
 
 // Exemplo oficial da RFC 8291 (seção 5 e apêndice A).
@@ -170,4 +171,34 @@ test('chaves VAPID: sem configurar, o envio para iPhone fica desligado', () => {
   assert.equal(lerChavesVapid(() => undefined), null)
   const lidas = lerChavesVapid((n) => ({ VAPID_PUBLIC_KEY: ' pub ', VAPID_PRIVATE_KEY: 'priv' })[n])
   assert.deepEqual(lidas, { publica: 'pub', privada: 'priv', contato: 'https://arte10barbarbearia.netlify.app' })
+})
+
+test('só manda aviso para serviços de push de verdade (sem SSRF)', async () => {
+  for (const bom of [
+    'https://fcm.googleapis.com/fcm/send/abc',
+    'https://web.push.apple.com/QGx1',
+    'https://updates.push.services.mozilla.com/wpush/v2/gAAA',
+    'https://wns2-bn3p.notify.windows.com/w/?token=BQYAAA',
+  ]) {
+    assert.equal(endpointPushPermitido(bom), true, bom)
+  }
+  for (const ruim of [
+    'https://evil.example/push',
+    'https://fcm.googleapis.com.evil.example/x',
+    'https://evil.example/https://fcm.googleapis.com/',
+    'http://fcm.googleapis.com/fcm/send/abc',
+    'https://fcm.googleapis.com:8443/fcm/send/abc',
+    'https://usuario:senha@fcm.googleapis.com/fcm/send/abc',
+    'https://169.254.169.254/latest/meta-data',
+    'https://localhost/x',
+    'não é url',
+  ]) {
+    assert.equal(endpointPushPermitido(ruim), false, ruim)
+  }
+  const n = { id: '00000000-0000-0000-0000-000000000001', agendamento_id: null, tipo: 'novo_agendamento', titulo: 'T', corpo: 'C', dados: {} }
+  const chaves = { publica: 'x', privada: 'y', contato: 'https://arte10barbarbearia.netlify.app' }
+  await assert.rejects(
+    () => montarPedidoWebPush({ endpoint: 'https://evil.example/x', p256dh: 'a', auth: 'b' }, n, chaves),
+    /fora dos serviços de push/
+  )
 })

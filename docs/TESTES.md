@@ -3,12 +3,12 @@
 ## Como rodar
 
 ```powershell
-# Banco (136), push do Android (9), avisos do iPhone (6) e instalador (5)
+# Banco (136), push do Android (9), avisos do iPhone (7), instalador (5) e blindagem (21)
 cd C:\arte10\supabase\tests
 npm install
 npm test
 
-# Site (58)
+# Site (60)
 cd C:\arte10\web
 npm test
 
@@ -37,6 +37,7 @@ arquivo extra é `auth_shim.sql`, que recria o mínimo do Supabase (schema
 | Conta do cliente (login) | Número brasileiro válido, senha com bcrypt e sessão só em hash, número/e-mail sem repetir, entrar por número ou e-mail, trava depois de 5 senhas erradas, sessão vencida, agendar logado, cada conta só vê os próprios horários, freio de contas novas |
 | Edge Function (`fcm.test.mjs`) | Classificação dos erros do FCM (um erro de payload não desativa aparelhos), mensagem, token, UUID |
 | Instalador (`instalador.test.mjs`) | `instalar_tudo.sql` em dia, roda duas vezes sem erro, `limpar_testes.sql`, `ativar_push.sql` protegido |
+| Blindagem (`seguranca.test.mjs`) | IP certo (cf-connecting-ip; x-forwarded-for forjado não engana), contador com janela deslizante, 429 + Retry-After, freio por rota e por IP, /rpc só por POST, pedido grande (413), freios de login/conta/agendamento/cancelamento, funções por telefone fechadas, plano só da própria conta, aviso só para serviços de push (sem SSRF) e até 5 aparelhos, sessão de 1 ano, link do mapa sem `javascript:`, agenda pública sem histórico |
 
 Os 27 casos do item 33 da especificação estão cobertos por esses grupos; o
 detalhamento por caso está em [AUDITORIA.md](AUDITORIA.md).

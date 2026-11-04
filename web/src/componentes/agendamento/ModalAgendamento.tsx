@@ -56,8 +56,11 @@ interface Props {
 }
 
 function novaChave(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
-  return `k-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+  const c: Partial<Crypto> = globalThis.crypto ?? {}
+  if (typeof c.randomUUID === 'function') return c.randomUUID()
+  // Navegador antigo sem randomUUID: ainda assim, sorteio criptográfico.
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  return `k-${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`
 }
 
 export function ModalAgendamento({

@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto'
 import {
   criarBanco,
   comoAnonimo,
+  comoInterno,
+  comoPedido,
   comoAdmin,
   comoUsuarioComum,
   comoServico,
@@ -110,9 +112,9 @@ async function criarAgendamentoPassado(nome, telefone, diasAtras = 1, hora = '10
   return r.id
 }
 
-/** Chama criar_agendamento como o site publico faria (role anon). */
+/** Motor de agendamento, chamado por dentro (o site chega nele pela conta). */
 function agendar({ servicoId, data, horario, nome = 'João Silva', telefone = '17999990001', chave = null }) {
-  return comoAnonimo(db, async () => {
+  return comoInterno(db, async () => {
     const r = await uma('select public.criar_agendamento($1,$2,$3,$4,$5,$6) as res', [
       servicoId,
       data,
@@ -1186,7 +1188,7 @@ const CORTE_P = (await umaP("select id from public.servicos where nome = 'Corte 
 const DIA_P = DIA
 
 function agendarP(horario, telefone) {
-  return comoAnonimo(dbp, async () =>
+  return comoInterno(dbp, async () =>
     (await umaP('select public.criar_agendamento($1,$2,$3,$4,$5,$6) as res', [
       CORTE_P, DIA_P, horario, 'Cliente Push', telefone, null,
     ])).res
@@ -1345,12 +1347,14 @@ const DIA_C2 = iso((await umaC(
 const TEL_PLANO = '17911112222'
 
 const anonC = (sql, params = []) => comoAnonimo(dbc, () => umaC(sql, params))
+// Motor de agendamento e de planos: o site chega neles pela conta logada.
+const internoC = (sql, params = []) => comoInterno(dbc, () => umaC(sql, params))
 const donoC = (sql, params = []) => comoAdmin(dbc, ID_DONO_C, () => umaC(sql, params))
 const agendarC = (servicoId, horario, telefone = TEL_PLANO, nome = 'Cliente do Plano', data = DIA_C) =>
-  anonC('select public.criar_agendamento($1,$2,$3,$4,$5) as r', [
+  internoC('select public.criar_agendamento($1,$2,$3,$4,$5) as r', [
     servicoId, data, horario, nome, telefone,
   ]).then((x) => x.r)
-const meuPlano = async (tel = TEL_PLANO) => (await anonC('select public.meu_plano($1) as r', [tel])).r.plano
+const meuPlano = async (tel = TEL_PLANO) => (await internoC('select public.meu_plano($1) as r', [tel])).r.plano
 
 await teste('o site lê os planos e promoções ativos, mas não os planos dos clientes', async () => {
   const planos = await comoAnonimo(dbc, () => todasC('select nome from public.planos order by ordem'))
@@ -1367,12 +1371,12 @@ await teste('o site lê os planos e promoções ativos, mas não os planos dos c
 })
 
 await teste('pedir um plano avisa o dono e não deixa pedir dois', async () => {
-  const r = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', '(17) 91111-2222'])).r
+  const r = (await internoC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', '(17) 91111-2222'])).r
   verdadeiro(r.ok, `pedido recusado: ${r.mensagem}`)
   igual(r.assinatura.status, 'solicitada')
   const n = await umaC("select * from public.notificacoes where tipo = 'plano_solicitado'")
   verdadeiro(n.corpo.includes('Cliente do Plano') && n.corpo.includes('Plano Elite') && n.corpo.includes('110,00'), n.corpo)
-  const de_novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
+  const de_novo = (await internoC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
   igual(de_novo.erro, 'PLANO_JA_SOLICITADO')
   igual((await meuPlano()).status, 'solicitada')
 })
@@ -1465,7 +1469,7 @@ await teste('usou todos os cortes: o plano fecha e o cliente pode pegar outro', 
   igual([p.status, p.restantes], ['encerrada', 0])
   const extra = await agendarC(CORTE_C.id, '11:00', TEL_PLANO, 'Cliente do Plano', DIA_C2)
   igual(extra.agendamento.plano, null, 'descontou além do total')
-  const novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
+  const novo = (await internoC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Cliente do Plano', TEL_PLANO])).r
   verdadeiro(novo.ok, `não deixou pedir novo plano: ${novo.mensagem}`)
 })
 
@@ -1548,7 +1552,7 @@ await teste('apagar cliente: só sem horário marcado e sem plano em aberto', as
 })
 
 await teste('planos encerrados podem ser excluídos; ativos e pedidos não', async () => {
-  const novo = (await anonC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Fulano Plano', '17966667777'])).r
+  const novo = (await internoC('select public.solicitar_plano($1,$2,$3) as r', [ELITE.id, 'Fulano Plano', '17966667777'])).r
   igual((await donoC('select public.excluir_assinatura($1) as r', [novo.assinatura.id])).r.erro, 'ASSINATURA_ESTADO')
   await donoC('select public.encerrar_assinatura($1)', [novo.assinatura.id])
   verdadeiro((await donoC('select public.excluir_assinatura($1) as r', [novo.assinatura.id])).r.ok)
@@ -1645,13 +1649,15 @@ await teste('conta criada: senha e sessão nunca ficam em texto no banco', async
     r.sessao.token,
   ])
   igual(s.n, 0, 'código de sessão guardado em texto')
-  // Fica logado "para sempre": a sessão não vence sozinha.
+  // Fica logado enquanto usar o site: 1 ano, renovado a cada dia de uso
+  // (antes eram 10 anos — um código vazado valeria para sempre).
   const prazo = await umaK(
-    `select expira_em > now() + interval '9 years' as longe from public.sessoes_conta
+    `select expira_em > now() + interval '364 days' and expira_em <= now() + interval '366 days' as certo
+       from public.sessoes_conta
       where token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex')`,
     [r.sessao.token]
   )
-  verdadeiro(prazo?.longe, 'a sessão vence cedo demais')
+  verdadeiro(prazo?.certo, 'a sessão não dura 1 ano')
   TOKEN_MARIA = r.sessao.token
 })
 
@@ -1736,7 +1742,9 @@ await teste('cada conta só vê os horários que ela mesma marcou', async () => 
   verdadeiro(rp.ok, rp.mensagem)
 
   // Agendamento sem conta usando o número da Maria: não entra na conta dela.
-  const avulso = await rpcK('criar_agendamento', [CORTE_K.id, DIA_K, '15:00', 'Alguém', '17988880001', null])
+  const avulso = (await comoInterno(dbk, () =>
+    umaK('select public.criar_agendamento($1,$2,$3,$4,$5,null) as r', [CORTE_K.id, DIA_K, '15:00', 'Alguém', '17988880001'])
+  )).r
   verdadeiro(avulso.ok, avulso.mensagem)
 
   igual((await rpcK('minha_conta', [TOKEN_MARIA])).proximos.map((a) => a.id), [AG_MARIA])
@@ -1920,7 +1928,9 @@ async function agendamentoDaqui(minutos, telefone = '17955551234', nome = 'Ana L
 
 await teste('dono vê hoje e os próximos dias, com o telefone do cliente', async () => {
   const r1 = await rpcL('criar_agendamento_conta', [TOKEN_L, CORTE_L.id, DIA_L, '10:00', null])
-  const r2 = await rpcL('criar_agendamento', [CORTE_L.id, DIA_L, '09:00', 'Carlos Avulso', '17955550000', null])
+  const r2 = (await comoInterno(dbl, () =>
+    umaL('select public.criar_agendamento($1,$2,$3,$4,$5,null) as r', [CORTE_L.id, DIA_L, '09:00', 'Carlos Avulso', '17955550000'])
+  )).r
   verdadeiro(r1.ok && r2.ok, `${r1.mensagem} ${r2.mensagem}`)
 
   const lista = (await comoAdmin(dbl, ID_DONO_L, () => umaL('select public.proximos_agendamentos(7) as r'))).r

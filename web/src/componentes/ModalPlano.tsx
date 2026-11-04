@@ -30,7 +30,7 @@ interface Props {
 
 export function ModalPlano({ plano, config, aoFechar }: Props) {
   // O plano sai no nome e no número da conta (dá para trocar, se for para outra pessoa).
-  const { conta } = useConta()
+  const { conta, token } = useConta()
   const [salvo] = useState(() =>
     conta ? { nome: conta.nome, telefone: conta.telefone } : lerCliente(),
   )
@@ -59,11 +59,15 @@ export function ModalPlano({ plano, config, aoFechar }: Props) {
     if (enviando) return
     setTentou(true)
     if (!nomeValido(nome) || !telefoneValido(telefone)) return
+    if (!token) {
+      setErro('Entre na sua conta para pedir o plano.')
+      return
+    }
 
     setEnviando(true)
     setErro(null)
     try {
-      const r = await solicitarPlano(plano.id, nome, telefone)
+      const r = await solicitarPlano(token, plano.id, nome, telefone)
       if (r.ok) {
         salvarCliente({ nome: nome.trim(), telefone: telefone.replace(/\D/g, '') })
         setPedido(r.assinatura)

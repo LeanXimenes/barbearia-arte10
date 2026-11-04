@@ -6,6 +6,8 @@ node_modules/
 # Build
 dist/
 dist-painel/
+dist-demo/
+dist-painel-demo/
 build/
 .vite/
 *.tsbuildinfo

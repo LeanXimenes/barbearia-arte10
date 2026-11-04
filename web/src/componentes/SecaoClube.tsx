@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { Assinatura, ConfigBarbearia, Plano, Servico } from '../lib/tipos'
 import { contaDoPlano, precoDoCorteDoPlano, sufixoDoPreco, vantagensDoPlano } from '../lib/planos'
 import { useClube } from '../hooks/useClube'
-import { lerCliente } from '../lib/clienteSalvo'
 import { useConta } from '../hooks/useConta'
 import { consultarMeuPlano } from '../servicos/api'
 import { dataCurtaDoInstante, linkWhatsapp } from '../lib/formato'
@@ -25,20 +24,20 @@ export function SecaoClube({ config, servicos }: Props) {
   const [meuPlano, setMeuPlano] = useState<Assinatura | null>(null)
 
   // Quem está logado (ou já agendou neste celular) vê a situação do próprio plano.
-  const { conta } = useConta()
+  const { conta, token } = useConta()
   const telefoneDaConta = conta?.telefone ?? null
   const atualizarMeuPlano = () => {
-    const telefone = telefoneDaConta ?? lerCliente()?.telefone
-    if (!telefone) {
+    // O banco só mostra o plano do número da própria conta.
+    if (!token) {
       setMeuPlano(null)
       return
     }
-    consultarMeuPlano(telefone)
+    consultarMeuPlano(token)
       .then(setMeuPlano)
       .catch(() => setMeuPlano(null))
   }
   // Entrou ou saiu da conta: o plano mostrado acompanha.
-  useEffect(atualizarMeuPlano, [telefoneDaConta])
+  useEffect(atualizarMeuPlano, [telefoneDaConta, token])
 
   return (
     <div className="container aba__conteudo clube">

@@ -51,9 +51,8 @@ const FUNCOES_PERMITIDAS = new Set([
   // site
   'horarios_disponiveis',
   'dias_disponiveis',
-  'criar_agendamento',
-  'solicitar_plano',
-  'meu_plano',
+  'solicitar_plano_conta',
+  'meu_plano_conta',
   'criar_conta',
   'entrar',
   'sair',
@@ -148,16 +147,57 @@ function claimsDoPedido(req) {
   return { role: 'anon' }
 }
 
-async function comPapel(claims, fn) {
+// IP de mentira do visitante da demonstração (um IP local não é contado
+// pelos freios). Troque com ARTE10_DEMO_IP para simular outra rede.
+const IP_DEMO = process.env.ARTE10_DEMO_IP || '203.0.113.10'
+
+/** Erro que o PostgREST devolveria com outro status HTTP (SQLSTATE PGRST). */
+class RespostaHttp extends Error {
+  constructor(status, corpo, cabecalhos = {}) {
+    super(corpo?.message ?? 'erro')
+    this.status = status
+    this.corpo = corpo
+    this.cabecalhos = cabecalhos
+  }
+}
+
+/**
+ * Roda como o PostgREST do Supabase: papel + cabeçalhos do pedido, a
+ * checagem antes de tudo (db_pre_request) e o status/cabeçalhos que a
+ * função pedir (response.status / response.headers).
+ */
+async function comPapel(claims, fn, pedido = {}) {
+  const { metodo = 'POST', caminho = '/', somenteLeitura = false, tamanho = 0 } = pedido
   await db.exec('begin')
   try {
-    await db.query('select set_config($1,$2,true)', ['request.jwt.claims', JSON.stringify(claims)])
+    if (somenteLeitura) await db.exec('set transaction read only')
+    const cabecalhos = { 'cf-connecting-ip': IP_DEMO, 'content-length': String(tamanho) }
+    for (const [nome, valor] of [
+      ['request.jwt.claims', JSON.stringify(claims)],
+      ['request.headers', JSON.stringify(cabecalhos)],
+      ['request.method', metodo],
+      ['request.path', caminho],
+    ]) {
+      await db.query('select set_config($1,$2,true)', [nome, valor])
+    }
     await db.exec(`set local role ${claims.role === 'authenticated' ? 'authenticated' : 'anon'}`)
+    await db.query('select private.checar_requisicao()')
     const r = await fn()
+    const extra = (await db.query(
+      "select current_setting('response.status', true) as s, current_setting('response.headers', true) as h"
+    )).rows[0]
     await db.exec('commit')
+    if (extra?.s && extra.s !== '200') {
+      const cab = extra.h ? Object.assign({}, ...JSON.parse(extra.h)) : {}
+      throw new RespostaHttp(Number(extra.s), r?.rows?.[0]?.r ?? null, cab)
+    }
     return r
   } catch (e) {
     await db.exec('rollback').catch(() => {})
+    if (e?.code === 'PGRST') {
+      const http = JSON.parse(e.detail)
+      throw new RespostaHttp(http.status, JSON.parse(e.message), http.headers ?? {})
+    }
     throw e
   }
 }
@@ -175,8 +215,8 @@ function cabecalhosCors(req) {
   }
 }
 
-function responder(req, res, status, corpo) {
-  res.writeHead(status, cabecalhosCors(req))
+function responder(req, res, status, corpo, extras = {}) {
+  res.writeHead(status, { ...cabecalhosCors(req), ...extras })
   res.end(corpo === undefined ? '' : JSON.stringify(corpo))
 }
 
@@ -324,7 +364,11 @@ const servidor = createServer(async (req, res) => {
         ? `select * from public.${funcao}(${argumentos})`
         : `select public.${funcao}(${argumentos}) as r`
 
-      const resultado = await comPapel(claims, () => db.query(sql, valores))
+      const resultado = await comPapel(claims, () => db.query(sql, valores), {
+        metodo: 'POST',
+        caminho: `/rpc/${funcao}`,
+        tamanho: Number(req.headers['content-length'] ?? 0),
+      })
       return responder(req, res, 200, retornaConjunto ? resultado.rows : resultado.rows[0]?.r ?? null)
     }
 
@@ -335,7 +379,11 @@ const servidor = createServer(async (req, res) => {
       if (req.method === 'GET') {
         if (!TABELAS_LEITURA.has(tabela)) return responder(req, res, 404, { message: `tabela não exposta: ${tabela}` })
         const { sql, valores } = montarSelect(tabela, url.searchParams)
-        const resultado = await comPapel(claims, () => db.query(sql, valores))
+        const resultado = await comPapel(claims, () => db.query(sql, valores), {
+          metodo: 'GET',
+          caminho: `/${tabela}`,
+          somenteLeitura: true,
+        })
         const umSo = (req.headers.accept ?? '').includes('vnd.pgrst.object')
         if (umSo) {
           if (resultado.rows.length !== 1) return responder(req, res, 406, { message: 'esperava uma linha' })
@@ -383,6 +431,9 @@ const servidor = createServer(async (req, res) => {
 
     responder(req, res, 404, { message: 'rota inexistente' })
   } catch (erro) {
+    if (erro instanceof RespostaHttp) {
+      return responder(req, res, erro.status, erro.corpo, erro.cabecalhos)
+    }
     console.error('Erro:', erro.message)
     const negado = /permission denied|row-level security/i.test(erro.message)
     responder(req, res, negado ? 403 : 400, { message: erro.message, code: erro.code ?? 'LOCAL' })

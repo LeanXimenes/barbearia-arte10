@@ -29,7 +29,9 @@ self.addEventListener('push', (evento) => {
 
 self.addEventListener('notificationclick', (evento) => {
   evento.notification.close()
-  const destino = new URL(evento.notification.data?.url || '/', self.location.origin).href
+  const pedido = new URL(evento.notification.data?.url || '/', self.location.origin)
+  // O aviso só abre páginas do próprio site, nunca um endereço de fora.
+  const destino = pedido.origin === self.location.origin ? pedido.href : `${self.location.origin}/`
 
   evento.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
